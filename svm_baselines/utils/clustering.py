@@ -19,6 +19,8 @@ def _as_cluster_feats(im, grad, coords):
 	]).transpose()
 
 def cluster_gradient(im, grad, K=4, thresh=None, init_from_maximas=False):
+	assert K is not None and K > 0, "Positive K is required!"
+
 	### get x,y coordinates
 	if thresh is None:
 		idxs = np.arange(np.multiply(*grad.shape))

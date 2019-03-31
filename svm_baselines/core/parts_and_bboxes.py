@@ -1,9 +1,8 @@
 import numpy as np
 from functools import partial
 from scipy.optimize import minimize, Bounds
-from scipy.ndimage.filters import gaussian_filter
 
-from svm_baselines.utils.image import prepare_back, grad_to_im
+from svm_baselines.utils.image import grad_correction
 from svm_baselines.utils.clustering import cluster_gradient
 
 
@@ -75,36 +74,26 @@ def get_boxes(centers, labels, **kwargs):
 		res.append([i, ((x0, y0), w, h)])
 	return res
 
+def _boxes(im, grad, optimal=True, **kwargs):
+	thresh = np.abs(grad).mean()
+	centers, labs = cluster_gradient(im, grad, **kwargs)
+	if optimal:
+		# Boxes optimized for maximum recall
+		return get_boxes(centers, labs, optimize=True, grad=grad)
+	else:
+		return get_boxes(centers, labs, optimize=False)
+
+def optimal_boxes(im, grad, **kwargs):
+	return _boxes(im, grad, optimal=True, **kwargs)
+
+def simple_boxes(im, grad, **kwargs):
+	return _boxes(im, grad, optimal=False, **kwargs)
+
 def get_parts(im, grad, xp=np,
 	alpha=0.5, gamma=1.0, sigma=1,
 	peak_size=None, K=None, init_from_maximas=False):
 
-	# refactor this code! ########################################
-	# its duplicate from core.visualization.plot_gradient ########
-	grad = prepare_back(grad_to_im(grad, xp=xp))
-
-	if sigma is None:
-		grad = grad.squeeze()
-	else:
-		grad = gaussian_filter(grad, sigma=sigma).squeeze()
-
-	grad = grad**gamma
-	##############################################################
-
-	assert K is not None, "For extraction K is required!"
-
-	# refactor this code! ########################################
-	# its duplicate from core.visualization.plot_gradient ########
-	thresh = np.abs(grad).mean()
-	centers, labs = cluster_gradient(
-		im, grad,
+	grad = grad_correction(grad, xp, sigma, gamma)
+	return optimal_boxes(im, grad,
 		K=K, thresh=thresh,
-		init_from_maximas=init_from_maximas
-	)
-	# Boxes optimized for maximum recall
-	boxes = get_boxes(centers, labs, optimize=True, grad=grad)
-
-	##############################################################
-
-
-	return boxes
+		init_from_maximas=init_from_maximas)

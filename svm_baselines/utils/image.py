@@ -18,3 +18,13 @@ def prepare_back(im):
 def grad_to_im(grad, xp=np, keepdims=True):
 	return xp.abs(grad).mean(axis=0, keepdims=keepdims)
 
+def grad_correction(grad, xp=np, sigma=None, gamma=1.):
+
+	grad = prepare_back(grad_to_im(grad, xp=xp))
+
+	if sigma is None:
+		grad = grad.squeeze()
+	else:
+		grad = gaussian_filter(grad, sigma=sigma).squeeze()
+
+	return grad**gamma

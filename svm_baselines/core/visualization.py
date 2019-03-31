@@ -6,13 +6,11 @@ from chainer.cuda import to_cpu
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
 
-from scipy.ndimage.filters import gaussian_filter
 from functools import partial
 
-from svm_baselines.core.parts_and_bboxes import get_boxes
+from svm_baselines.core.parts_and_bboxes import optimal_boxes, simple_boxes
 from svm_baselines.utils import prop_back
-from svm_baselines.utils.image import prepare_back, grad_to_im
-from svm_baselines.utils.clustering import cluster_gradient
+from svm_baselines.utils.image import prepare_back, grad_correction
 
 def imshow(im, ax=None, figsize=(32, 18), **kwargs):
 	if ax is None:
@@ -48,17 +46,7 @@ def plot_gradient(im, grad, xp=np, ax=None, title="",
 	alpha=0.5, gamma=1.0, sigma=1,
 	peak_size=None, K=None, init_from_maximas=False):
 
-	# refactor this code! ########################################
-	# its duplicate from core.parts_and_bboxes.get_parts #########
-	grad = prepare_back(grad_to_im(grad, xp=xp))
-
-	if sigma is None:
-		grad = grad.squeeze()
-	else:
-		grad = gaussian_filter(grad, sigma=sigma).squeeze()
-
-	grad = grad**gamma
-	##############################################################
+	grad = grad_correction(grad, xp, sigma, gamma)
 
 	if ax is None:
 		_, ax = plt.subplots(figsize=(16, 9))
@@ -72,20 +60,19 @@ def plot_gradient(im, grad, xp=np, ax=None, title="",
 	cmap = plt.cm.jet
 	if K is not None and K > 0:
 
-		# refactor this code! ########################################
-		# its duplicate from core.parts_and_bboxes.get_parts #########
-		thresh = np.abs(grad).mean()
-		centers, labs = cluster_gradient(im, grad,
+		boxes = optimal_boxes(im, grad,
 			K=K, thresh=thresh,
 			init_from_maximas=init_from_maximas)
-		boxes = get_boxes(centers, labs, optimize=True, grad=grad)
-		##############################################################
+
 		for c, box in boxes:
 			ax.add_patch(Rectangle(
 				*box, fill=False,
 				color=cmap(c / len(boxes))))
 
-		boxes = get_boxes(centers, labs, optimize=False)
+		boxes = simple_boxes(im, grad,
+			K=K, thresh=thresh,
+			init_from_maximas=init_from_maximas)
+
 		for c, box in boxes:
 			ax.add_patch(Rectangle(
 				*box, fill=False,
