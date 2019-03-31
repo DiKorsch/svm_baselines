@@ -1,6 +1,7 @@
 import numpy as np
-from chainer.cuda import to_cpu
 
+from chainer.cuda import to_cpu
+from scipy.ndimage.filters import gaussian_filter
 
 def normalize(im, axis=(1,2)):
 	im = im - im.min(axis=axis, keepdims=True)
