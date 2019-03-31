@@ -102,6 +102,4 @@ README.html
 
 *.npz
 *.npy
-.ipynb_checkpoints
-*.txt
 .out/*
