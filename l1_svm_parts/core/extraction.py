@@ -3,9 +3,9 @@ from chainer.cuda import to_cpu
 
 from functools import partial
 
-from svm_baselines.core.parts_and_bboxes import get_parts
-from svm_baselines.utils import prop_back
-from svm_baselines.utils.image import prepare_back
+from l1_svm_parts.core.parts_and_bboxes import get_parts
+from l1_svm_parts.utils import prop_back
+from l1_svm_parts.utils.image import prepare_back
 
 def extract_parts(model, coefs, ims, labs, feats, topk_preds,
 	**kwargs):

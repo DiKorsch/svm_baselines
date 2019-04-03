@@ -2,8 +2,8 @@ import numpy as np
 from functools import partial
 from scipy.optimize import minimize, Bounds
 
-from svm_baselines.utils.image import grad_correction
-from svm_baselines.utils.clustering import cluster_gradient
+from l1_svm_parts.utils.image import grad_correction
+from l1_svm_parts.utils.clustering import cluster_gradient
 
 
 def fit_bbox(mask, grad=None, optimize=False):
@@ -75,13 +75,14 @@ def get_boxes(centers, labels, **kwargs):
 	return res
 
 def _boxes(im, grad, optimal=True, **kwargs):
-	thresh = np.abs(grad).mean()
+	if "thresh" not in kwargs:
+		kwargs["thresh"] = np.abs(grad).mean()
 	centers, labs = cluster_gradient(im, grad, **kwargs)
 	if optimal:
 		# Boxes optimized for maximum recall
-		return get_boxes(centers, labs, optimize=True, grad=grad)
+		return get_boxes(centers, labs, optimize=True, grad=grad), centers, labs
 	else:
-		return get_boxes(centers, labs, optimize=False)
+		return get_boxes(centers, labs, optimize=False), centers, labs
 
 def optimal_boxes(im, grad, **kwargs):
 	return _boxes(im, grad, optimal=True, **kwargs)
@@ -94,6 +95,7 @@ def get_parts(im, grad, xp=np,
 	peak_size=None, K=None, init_from_maximas=False):
 
 	grad = grad_correction(grad, xp, sigma, gamma)
-	return optimal_boxes(im, grad,
-		K=K, thresh=thresh,
-		init_from_maximas=init_from_maximas)
+	boxes, centers, labs = optimal_boxes(im, grad,
+		K=K, init_from_maximas=init_from_maximas)
+
+	return boxes

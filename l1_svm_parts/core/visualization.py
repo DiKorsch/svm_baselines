@@ -8,9 +8,9 @@ from matplotlib.patches import Rectangle
 
 from functools import partial
 
-from svm_baselines.core.parts_and_bboxes import optimal_boxes, simple_boxes
-from svm_baselines.utils import prop_back
-from svm_baselines.utils.image import prepare_back, grad_correction
+from l1_svm_parts.core.parts_and_bboxes import optimal_boxes, simple_boxes
+from l1_svm_parts.utils import prop_back
+from l1_svm_parts.utils.image import prepare_back, grad_correction
 
 def imshow(im, ax=None, figsize=(32, 18), **kwargs):
 	if ax is None:
@@ -60,8 +60,8 @@ def plot_gradient(im, grad, xp=np, ax=None, title="",
 	cmap = plt.cm.jet
 	if K is not None and K > 0:
 
-		boxes = optimal_boxes(im, grad,
-			K=K, thresh=thresh,
+		boxes, centers, labs = optimal_boxes(im, grad,
+			K=K,
 			init_from_maximas=init_from_maximas)
 
 		for c, box in boxes:
@@ -69,8 +69,8 @@ def plot_gradient(im, grad, xp=np, ax=None, title="",
 				*box, fill=False,
 				color=cmap(c / len(boxes))))
 
-		boxes = simple_boxes(im, grad,
-			K=K, thresh=thresh,
+		boxes, centers, labs = simple_boxes(im, grad,
+			K=K,
 			init_from_maximas=init_from_maximas)
 
 		for c, box in boxes:

@@ -11,7 +11,7 @@ if [[ -z $DATASET ]]; then
 	exit -1
 fi
 
-TRAINED_SVM="../clf_${DATASET}.GLOBAL.${MODEL_TYPE}_glob_only_sparse_coefs.npz"
+TRAINED_SVM="../.out/clf_${DATASET}.GLOBAL.${MODEL_TYPE}_glob_only_sparse_coefs.npz"
 
 $PYTHON $SCRIPT \
 	${DATA} \

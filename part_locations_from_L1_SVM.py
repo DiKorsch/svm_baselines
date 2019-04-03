@@ -21,9 +21,9 @@ from chainer_addons.links import PoolingType
 from chainer.cuda import to_cpu
 from chainer.dataset.convert import concat_examples
 
-from svm_baselines.utils import arguments, IdentityScaler
-from svm_baselines.core.visualization import show_feature_saliency, visualize_coefs
-from svm_baselines.core.extraction import extract_parts, parts_to_file
+from l1_svm_parts.utils import arguments, IdentityScaler
+from l1_svm_parts.core.visualization import show_feature_saliency, visualize_coefs
+from l1_svm_parts.core.extraction import extract_parts, parts_to_file
 
 
 def main(args):
