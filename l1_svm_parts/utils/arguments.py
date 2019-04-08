@@ -16,14 +16,15 @@ def parse_args():
 			Arg("trained_svm", type=str,
 				help="Trained L1 SVM"),
 
+
 			Arg("--n_jobs", type=int, default=2),
 
 			Arg("--scale_features", action="store_true"),
 			Arg("--visualize_coefs", action="store_true"),
 
 			Arg("--topk", type=int, default=5),
-			Arg("--extract", action="store_true"),
-
+			Arg("--extract", type=str, nargs=2,
+				help="outputs to store extracted part locations"),
 
 			Arg("--model_type", "-mt",
 				default="resnet", choices=info_file.MODELS.keys(),
@@ -32,12 +33,10 @@ def parse_args():
 			Arg("--input_size", type=int, default=0,
 				help="overrides default input size of the model, if greater than 0"),
 
+			Arg("--label_shift", type=int, default=1),
+
 			PrepareType.as_arg("prepare_type",
 				help_text="type of image preprocessing"),
-
-			Arg("--subset", "-sub",
-				default="train", choices=["train", "test"],
-				help="Dataset subsets. (\"test\" is equivalent to \"val\")"),
 
 			Arg("--K", type=int, default=4),
 			Arg("--init_from_maximas", action="store_true"),

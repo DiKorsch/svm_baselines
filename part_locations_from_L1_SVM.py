@@ -11,6 +11,7 @@ from tqdm import tqdm
 from sklearn.preprocessing import MinMaxScaler
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
+from functools import partial
 
 from nabirds.annotations import AnnotationType
 
@@ -26,12 +27,18 @@ from l1_svm_parts.core.visualization import show_feature_saliency, visualize_coe
 from l1_svm_parts.core.extraction import extract_parts, parts_to_file
 
 
+def topk_decision(X, y, clf, k):
+	decs = clf.decision_function(X)
+	topk_preds = np.argsort(decs)[:, -k:]
+	topk_accu = (topk_preds == np.expand_dims(y, 1)).max(axis=1).mean()
+	return topk_preds, topk_accu
+
 def main(args):
 	annot_cls = AnnotationType.get(args.dataset).value
 	parts_key = "{}_{}".format(args.dataset, "GLOBAL")
 
 	logging.info("Loading {} annotations from \"{}\"".format(
-		annot_cls.__name__, args.data))
+		annot_cls, args.data))
 	logging.info("Using \"{}\"-parts".format(parts_key))
 
 	annot = annot_cls(args.data,
@@ -43,25 +50,21 @@ def main(args):
 	model_info = data_info.MODELS[args.model_type]
 	part_info = data_info.PARTS[parts_key]
 
-	data = annot.new_dataset(subset=args.subset)
+	data = annot.new_dataset(subset=None)
+	train_data, val_data = map(annot.new_dataset, ["train", "test"])
 
-	assert data.features is not None, \
+	assert train_data.features is not None and val_data.features is not None, \
 		"Features are not loaded!"
 
-	assert data.features.ndim == 2 or data.features.shape[1] == 1, \
+	assert val_data.features.ndim == 2 or val_data.features.shape[1] == 1, \
 		"Only GLOBAL part features are supported here!"
-
 
 	if args.scale_features:
 		logging.info("Scaling data on training set!")
-		train_data = annot.new_dataset("train")
 		scaler = MinMaxScaler()
 		scaler.fit(train_data.features[:, -1])
 	else:
 		scaler = IdentityScaler()
-
-	X = scaler.transform(data.features[:, -1])
-	y = data.labels
 
 	trained_svm = "".format(
 		args.dataset, args.model_type)
@@ -78,14 +81,15 @@ def main(args):
 		logging.info("Visualizing coefficients...")
 		visualize_coefs(clf.coef_, figsize=(16, 9*3))
 
-	logging.info("Accuracy on subset ({}): {:.4%}".format(
-		args.subset, clf.score(X, y)))
+	for _data, subset in [(train_data, "training"), (val_data, "validation")]:
+		X = scaler.transform(_data.features[:, -1])
+		y = _data.labels
+		logging.info("Accuracy on {} subset: {:.4%}".format(subset, clf.score(X, y)))
 
-	decs = clf.decision_function(X)
-	topk_preds = np.argsort(decs)[:, -args.topk:]
-	topk_accu = (topk_preds == np.expand_dims(y, 1)).max(axis=1).mean()
-	logging.info("Validation Accuracy (Top{}): {:.4%}".format(
-		args.topk, topk_accu))
+		_topk_decision = partial(topk_decision, clf=clf, k=args.topk)
+
+		topk_preds, topk_accu = _topk_decision(X, y)
+		logging.info("Top{}-Accuracy on {} subset: {:.4%}".format(args.topk, subset, topk_accu))
 
 	model_cls = ModelType
 	logging.info("Creating and loading model ...")
@@ -115,7 +119,7 @@ def main(args):
 
 	logging.info("Loading \"{}\" weights from \"{}\"".format(
 		model_info.class_key, weights))
-	model.load_for_inference(n_classes=201, weights=weights)
+	model.load_for_inference(n_classes=part_info.n_classes + args.label_shift, weights=weights)
 
 	GPU = args.gpu[0]
 	if GPU >= 0:
@@ -129,6 +133,14 @@ def main(args):
 		repeat=False, shuffle=False
 	)
 
+
+	if args.extract:
+		assert args.extract is not None, \
+			"For extraction output files are required!"
+		pred_out, full_out = [open(out, "w") for out in args.extract]
+	else:
+		pred_out, full_out = None, None
+
 	for batch_i, batch in tqdm(enumerate(it), total=n_batches):
 		batch = [(prepare(im), lab) for im, _, lab in batch]
 		X, y = concat_examples(batch, device=GPU)
@@ -141,12 +153,7 @@ def main(args):
 		f = scaler.transform(to_cpu(feats.array))
 		gt = to_cpu(y)
 
-		decs = clf.decision_function(f)
-		sorted_pred = np.argsort(decs)
-		topk_preds = sorted_pred[:, -args.topk:]
-		topk_accu = (topk_preds == np.expand_dims(gt, 1)).max(axis=1).mean()
-
-		#preds = clf.predict(f)
+		topk_preds, topk_accu = _topk_decision(f, gt)
 
 		logging.debug("Batch Accuracy: {:.4%} (Top1) | {:.4%} (Top{}) {: 3d} / {: 3d}".format(
 
@@ -157,7 +164,6 @@ def main(args):
 			np.sum(topk_preds[:, -1] == gt),
 			len(batch)
 		))
-
 
 		kwargs = dict(
 			model=model, coefs=COEFS,
@@ -178,13 +184,16 @@ def main(args):
 			for i, parts in enumerate(extract_iter):
 				im_idx = i + batch_i * it.batch_size
 				for pred_part, full_part in zip(*parts):
-					parts_to_file(im_idx, *pred_part, out=None)#pred_out)
-					parts_to_file(im_idx, *full_part, out=None)#full_out)
+					parts_to_file(im_idx, *pred_part, out=pred_out)
+					parts_to_file(im_idx, *full_part, out=full_out)
 
-			raise ValueError("Open output files!")
 		else:
 			show_feature_saliency(**kwargs)
-		break
+			break
+
+	if None not in [pred_out, full_out]:
+		pred_out.close()
+		full_out.close()
 
 with chainer.using_config("train", False):
 	main(arguments.parse_args())

@@ -4,7 +4,11 @@ from skimage.feature import peak_local_max
 
 def _norm(arr):
 	arr = arr - arr.min()
-	return arr / arr.max()
+	arr_max = arr.max()
+	if arr_max == 0:
+		return arr
+	else:
+		return arr / arr_max
 
 def _as_cluster_feats(im, grad, coords):
 	ys, xs = coords
