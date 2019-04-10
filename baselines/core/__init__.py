@@ -28,18 +28,22 @@ def evaluate(opts, train, val, key):
 		evaluate_parts(opts, train, val, key, shuffle=True)
 
 def _get_clf(opts):
+	kwargs = dict(C=opts.C, max_iter=opts.max_iter)
+
 	if opts.sparse:
-		return partial(LinearSVC, penalty="l1", C=0.1, dual=False, max_iter=200)
+		return partial(LinearSVC,
+			penalty="l1", dual=False,
+			**kwargs)
 
 	elif opts.classifier == "svm":
-		return LinearSVC
+		return partial(LinearSVC,
+			**kwargs)
 
 	elif opts.classifier == "logreg":
 		return partial(LogisticRegression,
-			C=0.01,
 			solver='lbfgs',
 			multi_class='multinomial',
-			max_iter=500)
+			**kwargs)
 
 def evaluate_parts(opts, train, val, key, shuffle=False):
 

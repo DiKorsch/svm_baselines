@@ -22,6 +22,12 @@ def parse_args():
 		Arg("--classifier", "-clf", default="svm",
 			choices=["svm", "logreg"]),
 
+		Arg("--C", type=float, default=0.1,
+			help="classifier regularization parameter"),
+
+		Arg("--max_iter", type=int, default=200,
+			help="maximum number of training iterations"),
+
 		Arg("--show_feature_stats", action="store_true"),
 
 		Arg("--sparse", action="store_true",
