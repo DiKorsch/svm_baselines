@@ -52,4 +52,4 @@ def main(args):
 	evaluate(args, train, val, KEY)
 
 
-main(arguments.parse_args())
+main(arguments.train_args())

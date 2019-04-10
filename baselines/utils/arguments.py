@@ -8,7 +8,7 @@ DEFAULT_INFO_FILE="/home/korsch/Data/info.yml"
 
 info_file = read_info_file(DEFAULT_INFO_FILE)
 
-def parse_args():
+def train_args():
 	parser = BaseParser([
 		Arg("data", default=DEFAULT_INFO_FILE),
 
@@ -37,6 +37,34 @@ def parse_args():
 
 
 		Arg("--output", default=".out"),
+
+	])
+
+	parser.init_logger()
+
+	return parser.parse_args()
+
+
+def predict_args():
+	parser = BaseParser([
+		Arg("data", default=DEFAULT_INFO_FILE),
+
+		Arg("dataset", choices=info_file.DATASETS.keys()),
+		Arg("parts", choices=info_file.PARTS.keys()),
+		Arg("weights"),
+
+		Arg("--model_type", "-mt",
+			default="resnet", choices=info_file.MODELS.keys(),
+			help="type of the model"),
+
+		Arg("--subset", choices=[
+			"train", "test"
+		]),
+
+		Arg("--evaluate", action="store_true"),
+		Arg("--scale_features", action="store_true"),
+
+		Arg("--output", default="predictions.csv"),
 
 	])
 

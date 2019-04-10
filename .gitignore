@@ -103,3 +103,4 @@ README.html
 *.npz
 *.npy
 .out/*
+scripts/*.csv
