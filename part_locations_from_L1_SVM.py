@@ -14,10 +14,12 @@ from matplotlib.patches import Rectangle
 from functools import partial
 
 from nabirds.annotations import AnnotationType
+from nabirds.utils import new_iterator
 
 from chainer_addons.models import ModelType
 from chainer_addons.models import PrepareType
 from chainer_addons.links import PoolingType
+from chainer_addons.utils.imgproc import _center_crop
 
 from chainer.cuda import to_cpu
 from chainer.dataset.convert import concat_examples
@@ -100,22 +102,36 @@ def main(args):
 		pooling=PoolingType.G_AVG,
 		aux_logits=False,
 	)
+	size = model.meta.input_size
+	if not isinstance(size, tuple):
+		size = (size, size)
 
-	prepare = PrepareType[args.prepare_type](model)
+	_prepare = partial(PrepareType[args.prepare_type](model),
+			swap_channels=args.swap_channels)
 
-	logging.info("Using \"{}\" prepare function".format(
-		args.prepare_type))
+	prepare = lambda im: _center_crop(_prepare(im), size)
 
-	weight_subdir, _, _ = model_info.weights.rpartition(".")
-	weights = join(
-		data_info.BASE_DIR,
-		data_info.MODEL_DIR,
-		model_info.folder,
-		"ft_{}".format(args.dataset),
-		"rmsprop.g_avg_pooling",
-		weight_subdir,
-		"model_final.npz"
+	logging.info("Created {} model with \"{}\" prepare function. Image input size: {}"\
+		.format(
+			model.__class__.__name__,
+			args.prepare_type,
+			size
+		)
 	)
+
+	if args.weights:
+		weights = args.weights
+	else:
+		weight_subdir, _, _ = model_info.weights.rpartition(".")
+		weights = join(
+			data_info.BASE_DIR,
+			data_info.MODEL_DIR,
+			model_info.folder,
+			"ft_{}".format(args.dataset),
+			"rmsprop.g_avg_pooling",
+			weight_subdir,
+			"model_final.npz"
+		)
 
 	logging.info("Loading \"{}\" weights from \"{}\"".format(
 		model_info.class_key, weights))
@@ -127,9 +143,8 @@ def main(args):
 		model.to_gpu(GPU)
 
 
-	it, n_batches = data.new_iterator(
-		n_jobs=args.n_jobs,
-		batch_size=args.batch_size,
+	it, n_batches = new_iterator(data,
+		args.n_jobs, args.batch_size,
 		repeat=False, shuffle=False
 	)
 
@@ -142,6 +157,7 @@ def main(args):
 		pred_out, full_out = None, None
 
 	for batch_i, batch in tqdm(enumerate(it), total=n_batches):
+
 		batch = [(prepare(im), lab) for im, _, lab in batch]
 		X, y = concat_examples(batch, device=GPU)
 		ims = chainer.Variable(X)
@@ -171,6 +187,7 @@ def main(args):
 			feats=feats, topk_preds=topk_preds,
 
 			peak_size=None, #int(h * 0.35 / 2),
+			swap_channels=args.swap_channels,
 
 			gamma=args.gamma,
 			sigma=args.sigma,

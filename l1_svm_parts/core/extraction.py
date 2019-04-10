@@ -8,6 +8,7 @@ from l1_svm_parts.utils import prop_back
 from l1_svm_parts.utils.image import prepare_back
 
 def extract_parts(model, coefs, ims, labs, feats, topk_preds,
+	swap_channels=True,
 	**kwargs):
 
 	normalize_grads = False
@@ -23,7 +24,7 @@ def extract_parts(model, coefs, ims, labs, feats, topk_preds,
 	pred_im_grad = topk_pred_im_grad[-1]
 
 	full_im_grad = prop_back(model, feats, ims)
-	_get_parts = partial(get_parts, xp=model.xp, **kwargs)
+	_get_parts = partial(get_parts, xp=model.xp, swap_channels=swap_channels, **kwargs)
 
 	for i, (gt_coef, pred_coef) in enumerate(zip(gt_coefs, pred_coefs)):
 		im = prepare_back(ims[i])
@@ -35,9 +36,6 @@ def extract_parts(model, coefs, ims, labs, feats, topk_preds,
 
 def parts_to_file(im_id, part_id, box, out):
 	(x, y), w, h = box
-	# TODO: remove the x-axis flipping
-	#if "inception" in DATASET:
-	#    x = 299 - (x + w) # flip x-axis
 
 	print(im_id+1, int(part_id+1), *map(int, map(round, [x,y,w,h])),
 		file=out

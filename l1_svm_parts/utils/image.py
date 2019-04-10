@@ -12,16 +12,19 @@ def normalize(im, axis=(1,2)):
 		return im / chan_max
 
 
-def prepare_back(im):
+def prepare_back(im, swap_channels=True):
 	im = im.array if hasattr(im, "array") else im
-	return normalize(to_cpu(im))[::-1].transpose(1, 2, 0)
+	im = normalize(to_cpu(im))
+	if swap_channels:
+		im = im[::-1]
+	return im.transpose(1, 2, 0)
 
 def grad_to_im(grad, xp=np, keepdims=True):
 	return xp.abs(grad).mean(axis=0, keepdims=keepdims)
 
-def grad_correction(grad, xp=np, sigma=None, gamma=1.):
+def grad_correction(grad, xp=np, sigma=None, gamma=1., swap_channels=True):
 
-	grad = prepare_back(grad_to_im(grad, xp=xp))
+	grad = prepare_back(grad_to_im(grad, xp=xp), swap_channels)
 
 	if sigma is None:
 		grad = grad.squeeze()

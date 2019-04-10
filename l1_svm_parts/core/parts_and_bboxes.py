@@ -91,10 +91,11 @@ def simple_boxes(im, grad, **kwargs):
 	return _boxes(im, grad, optimal=False, **kwargs)
 
 def get_parts(im, grad, xp=np,
+	swap_channels=True,
 	alpha=0.5, gamma=1.0, sigma=1,
 	peak_size=None, K=None, init_from_maximas=False):
 
-	grad = grad_correction(grad, xp, sigma, gamma)
+	grad = grad_correction(grad, xp, sigma, gamma, swap_channels)
 	boxes, centers, labs = optimal_boxes(im, grad,
 		K=K, init_from_maximas=init_from_maximas)
 

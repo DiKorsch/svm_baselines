@@ -30,10 +30,15 @@ def parse_args():
 				default="resnet", choices=info_file.MODELS.keys(),
 				help="type of the model"),
 
+			Arg("--weights", "-w"),
+
 			Arg("--input_size", type=int, default=0,
 				help="overrides default input size of the model, if greater than 0"),
 
 			Arg("--label_shift", type=int, default=1),
+
+			Arg("--swap_channels", action="store_true",
+				help="preprocessing option: swap channels from RGB to BGR"),
 
 			PrepareType.as_arg("prepare_type",
 				help_text="type of image preprocessing"),

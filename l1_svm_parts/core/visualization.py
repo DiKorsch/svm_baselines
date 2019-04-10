@@ -43,10 +43,11 @@ def visualize_coefs(coefs, **kwargs):
 
 
 def plot_gradient(im, grad, xp=np, ax=None, title="",
+	swap_channels=True,
 	alpha=0.5, gamma=1.0, sigma=1,
 	peak_size=None, K=None, init_from_maximas=False):
 
-	grad = grad_correction(grad, xp, sigma, gamma)
+	grad = grad_correction(grad, xp, sigma, gamma, swap_channels)
 
 	if ax is None:
 		_, ax = plt.subplots(figsize=(16, 9))
@@ -100,6 +101,7 @@ def plot_gradient(im, grad, xp=np, ax=None, title="",
 
 
 def show_feature_saliency(model, coefs, ims, labs, feats, topk_preds,
+	swap_channels=True,
 	normalize_grads=False,
 	plot_topk_grads=False,
 	plot_sel_feats_grad=False,
@@ -122,7 +124,7 @@ def show_feature_saliency(model, coefs, ims, labs, feats, topk_preds,
 	# for g in [full_im_grad, pred_im_grad]:
 	# 	logging.debug(g.min(), g.max())
 
-	_plot_gradient = partial(plot_gradient, xp=model.xp, **kwargs)
+	_plot_gradient = partial(plot_gradient, xp=model.xp, swap_channels=swap_channels, **kwargs)
 
 	for i, (gt_coef, pred_coef) in enumerate(zip(gt_coefs, pred_coefs)):
 
@@ -131,7 +133,7 @@ def show_feature_saliency(model, coefs, ims, labs, feats, topk_preds,
 			preds[i], labs[i]))
 		fig, axs = plt.subplots(2, 2, figsize=(16, 9))
 
-		im = prepare_back(ims[i])
+		im = prepare_back(ims[i], swap_channels=swap_channels)
 		ax = imshow(im, ax=axs[0,0])
 		ax.set_title("Original Image [predicted: {}, GT: {}]".format(
 			preds[i], labs[i]))
