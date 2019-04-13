@@ -6,9 +6,32 @@ from l1_svm_parts.utils.image import grad_correction
 from l1_svm_parts.utils.clustering import cluster_gradient
 
 
-def fit_bbox(mask, grad=None, optimize=False):
+def _check_min_bbox(bbox, min_bbox):
+	y0, x0, y1, x1 = bbox
+	h, w = y1 - y0, x1 - x0
+
+	# if bbox is greater that min_bbox in both, the width and height
+	if min(h, w) >= min_bbox:
+		return bbox
+
+	old_bbox = bbox.copy()
+	dy, dx = max(min_bbox - h, 0), max(min_bbox - w, 0)
+
+	bbox[0] -= int(dy / 2)
+	bbox[1] -= int(dx / 2)
+	bbox[2] += int(dy / 2)
+	bbox[3] += int(dx / 2)
+
+	print("="*30)
+	print("Adjusted bbox from {} to {}".format(old_bbox, bbox))
+	print("="*30)
+	return bbox
+
+def fit_bbox(mask, grad=None, optimize=False, min_bbox=10):
 	ys, xs = np.where(mask)
 	bbox = np.array([min(ys), min(xs), max(ys), max(xs)])
+
+	bbox = _check_min_bbox(bbox, min_bbox)
 
 	if not optimize:
 		return bbox
@@ -44,12 +67,12 @@ def fit_bbox(mask, grad=None, optimize=False):
 
 	def Precision(b, mask):
 		TP, FP, FN, TN = _measures(b, mask)
-		return -(TP / (TP + TN))
+		return -(TP / (TP + FP))
 
 	def Fscore(b, mask, beta=1):
 		TP, FP, FN, TN = _measures(b, mask)
 		recall = TP / (TP + FN)
-		prec = TP / (TP + TN)
+		prec = TP / (TP + FP)
 
 		return -((1 + beta**2) * (recall * prec) / (recall + beta**2 * prec) )
 

@@ -32,8 +32,6 @@ def cluster_gradient(im, grad, K=4, thresh=None, init_from_maximas=False):
 	else:
 		coords = np.where(np.abs(grad) >= thresh)
 
-	data = _as_cluster_feats(im, grad, coords)
-
 	if init_from_maximas:
 		init_coords = peak_local_max(grad, num_peaks=K).T
 		init = _as_cluster_feats(im, grad, init_coords)
@@ -41,6 +39,7 @@ def cluster_gradient(im, grad, K=4, thresh=None, init_from_maximas=False):
 	else:
 		clf = KMeans(K)
 
+	data = _as_cluster_feats(im, grad, coords)
 	clf.fit(data)
 	labels = np.full(grad.shape, np.nan)
 	labels[coords] = clf.labels_
