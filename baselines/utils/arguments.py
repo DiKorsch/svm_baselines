@@ -28,11 +28,16 @@ def train_args():
 		Arg("--max_iter", type=int, default=200,
 			help="maximum number of training iterations"),
 
+		Arg("--load", type=str,
+			help="initial weights and biases to use as initialization"),
+
 		Arg("--show_feature_stats", action="store_true"),
+		Arg("--shuffle_part_features", action="store_true"),
 
 		Arg("--sparse", action="store_true",
 			help="Use LinearSVC with L1 regularization for sparse feature selection"),
 		Arg("--scale_features", action="store_true"),
+		Arg("--eval_local_parts", action="store_true"),
 		Arg("--no_dump", action="store_true"),
 
 
@@ -63,6 +68,10 @@ def predict_args():
 
 		Arg("--evaluate", action="store_true"),
 		Arg("--scale_features", action="store_true"),
+
+		Arg("--no_export", action="store_true"),
+
+		Arg("--label_shift", type=int, default=0),
 
 		Arg("--output", default="predictions.csv"),
 

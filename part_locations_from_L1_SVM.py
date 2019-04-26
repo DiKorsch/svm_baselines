@@ -156,10 +156,15 @@ def main(args):
 	else:
 		pred_out, full_out = None, None
 
+	min_label = data.labels.min()
+
+	logging.info("Minimum label value is \"{}\"".format(min_label))
+
 	for batch_i, batch in tqdm(enumerate(it), total=n_batches):
 
 		batch = [(prepare(im), lab) for im, _, lab in batch]
 		X, y = concat_examples(batch, device=GPU)
+
 		ims = chainer.Variable(X)
 
 		feats = model(ims, layer_name=model.meta.feature_layer)
@@ -200,9 +205,10 @@ def main(args):
 			extract_iter = extract_parts(**kwargs)
 			for i, parts in enumerate(extract_iter):
 				im_idx = i + batch_i * it.batch_size
+				im_uuid = data.uuids[im_idx]
 				for pred_part, full_part in zip(*parts):
-					parts_to_file(im_idx, *pred_part, out=pred_out)
-					parts_to_file(im_idx, *full_part, out=full_out)
+					parts_to_file(im_uuid, *pred_part, out=pred_out)
+					parts_to_file(im_uuid, *full_part, out=full_out)
 
 		else:
 			show_feature_saliency(**kwargs)

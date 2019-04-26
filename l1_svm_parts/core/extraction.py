@@ -37,7 +37,7 @@ def extract_parts(model, coefs, ims, labs, feats, topk_preds,
 def parts_to_file(im_id, part_id, box, out):
 	(x, y), w, h = box
 
-	print(im_id+1, int(part_id+1), *map(int, map(round, [x,y,w,h])),
+	print(im_id, int(part_id+1), *map(int, map(round, [x,y,w,h])),
 		file=out
 	)
 
