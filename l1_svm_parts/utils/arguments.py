@@ -2,7 +2,7 @@ from cvargparse import GPUParser, ArgFactory, Arg
 
 from chainer_addons.models import PrepareType
 
-from nabirds.utils import read_info_file
+from cvdatasets.utils import read_info_file
 
 DEFAULT_INFO_FILE="/home/korsch/Data/info.yml"
 

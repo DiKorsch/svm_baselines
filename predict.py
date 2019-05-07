@@ -17,7 +17,7 @@ from sklearn.preprocessing import MinMaxScaler
 from chainer_addons.models import ModelType
 from chainer_addons.links import PoolingType
 
-from nabirds.annotations import AnnotationType
+from cvdatasets.annotations import AnnotationType
 from baselines.utils import arguments, visualization
 
 class CNN_Wrapper(object):

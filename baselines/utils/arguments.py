@@ -2,7 +2,7 @@ from chainer_addons.models import PrepareType
 
 from cvargparse import BaseParser, Arg
 
-from nabirds.utils import read_info_file
+from cvdatasets.utils import read_info_file
 
 DEFAULT_INFO_FILE="/home/korsch/Data/info.yml"
 

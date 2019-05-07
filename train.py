@@ -10,7 +10,7 @@ from os.path import join
 import logging
 
 
-from nabirds.annotations import AnnotationType
+from cvdatasets.annotations import AnnotationType
 from baselines.utils import arguments, visualization
 from baselines.core import evaluate
 

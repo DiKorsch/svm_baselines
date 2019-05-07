@@ -13,8 +13,8 @@ from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
 from functools import partial
 
-from nabirds.annotations import AnnotationType
-from nabirds.utils import new_iterator
+from cvdatasets.annotations import AnnotationType
+from cvdatasets.utils import new_iterator
 
 from chainer_addons.models import ModelType
 from chainer_addons.models import PrepareType
