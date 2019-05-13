@@ -8,6 +8,8 @@ DEFAULT_INFO_FILE="/home/korsch/Data/info.yml"
 
 info_file = read_info_file(DEFAULT_INFO_FILE)
 
+from l1_svm_parts.utils import ThresholdType, ClusterInitType
+
 def parse_args():
 	parser = GPUParser(ArgFactory([
 			Arg("data", default=DEFAULT_INFO_FILE),
@@ -43,11 +45,14 @@ def parse_args():
 			PrepareType.as_arg("prepare_type",
 				help_text="type of image preprocessing"),
 
+			ThresholdType.as_arg("thresh_type",
+				help_text="type of gradient thresholding"),
+
 			Arg("--K", type=int, default=4),
-			Arg("--init_from_maximas", action="store_true"),
 
 			Arg("--gamma", type=float, default=0.7,
 				help="Gamma-Correction of the gradient intesities"),
+
 			Arg("--sigma", type=float, default=5,
 				help="Gaussian smoothing strength"),
 

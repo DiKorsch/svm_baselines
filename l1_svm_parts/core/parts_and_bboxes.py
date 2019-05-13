@@ -1,7 +1,11 @@
 import numpy as np
+import logging
+
 from functools import partial
 from scipy.optimize import minimize, Bounds
 
+from l1_svm_parts.utils import ClusterInitType
+from l1_svm_parts.utils import ThresholdType
 from l1_svm_parts.utils.image import grad_correction
 from l1_svm_parts.utils.clustering import cluster_gradient
 
@@ -22,9 +26,17 @@ def _check_min_bbox(bbox, min_bbox):
 	bbox[2] += int(dy / 2)
 	bbox[3] += int(dx / 2)
 
-	print("="*30)
-	print("Adjusted bbox from {} to {}".format(old_bbox, bbox))
-	print("="*30)
+	if (bbox < 0).any():
+		dy, dx, _, _ = np.minimum(bbox, 0)
+		bbox[0] -= dy
+		bbox[1] -= dx
+		bbox[2] -= dy
+		bbox[3] -= dx
+
+	text = f"Adjusted bbox from {old_bbox} to {bbox}"
+	logging.debug("=" * len(text))
+	logging.debug(text)
+	logging.debug("=" * len(text))
 	return bbox
 
 def fit_bbox(mask, grad=None, optimize=False, min_bbox=10):
@@ -55,22 +67,31 @@ def fit_bbox(mask, grad=None, optimize=False, min_bbox=10):
 		# scale back to the area mentioned in (2)
 		y0, x0, y1, x1 = map(int, b * scaler)
 		area = mask[y0:y1, x0:x1]
+		_h, _w = y1-y0, x1-x0
+
+		if _h < _w:
+			ratio = (_h/_w) if _w != 0 else -100
+		else:
+			ratio = (_w/_h) if _h != 0 else -100
+
 		TP = area.sum()
 		FP = (1-area).sum()
 		FN = mask.sum() - TP
 		TN = (1-mask).sum() - FP
-		return TP, FP, FN, TN
+
+		ratio = 1
+		return TP, FP, FN, TN, ratio
 
 	def Recall(b, mask):
-		TP, FP, FN, TN = _measures(b, mask)
-		return -(TP / (TP + FN))
+		TP, FP, FN, TN, ratio = _measures(b, mask)
+		return -(TP / (TP + FN)) * ratio
 
 	def Precision(b, mask):
-		TP, FP, FN, TN = _measures(b, mask)
+		TP, FP, FN, TN, ratio = _measures(b, mask)
 		return -(TP / (TP + FP))
 
 	def Fscore(b, mask, beta=1):
-		TP, FP, FN, TN = _measures(b, mask)
+		TP, FP, FN, TN, ratio = _measures(b, mask)
 		recall = TP / (TP + FN)
 		prec = TP / (TP + FP)
 
@@ -86,7 +107,9 @@ def fit_bbox(mask, grad=None, optimize=False, min_bbox=10):
 				   bounds=Bounds(0, 1),
 				  )
 	# scale back to (2) and shift to original values (1)
-	return res.x * scaler + np.array([y0, x0, y0, x0])
+	bbox = res.x * scaler + np.array([y0, x0, y0, x0])
+	bbox = _check_min_bbox(bbox, min_bbox)
+	return bbox
 
 def get_boxes(centers, labels, **kwargs):
 	values = labels[np.logical_not(np.isnan(labels))]
@@ -97,10 +120,16 @@ def get_boxes(centers, labels, **kwargs):
 		res.append([i, ((x0, y0), w, h)])
 	return res
 
-def _boxes(im, grad, optimal=True, **kwargs):
-	if "thresh" not in kwargs:
-		kwargs["thresh"] = np.abs(grad).mean()
-	centers, labs = cluster_gradient(im, grad, **kwargs)
+def _boxes(im, grad, optimal=True,
+	thresh_type=ThresholdType.Default,
+	**kwargs):
+
+	thresh_type = ThresholdType.get(thresh_type)
+	centers, labs = cluster_gradient(
+		im, grad,
+		thresh=thresh_type(im, grad),
+		**kwargs)
+
 	if optimal:
 		# Boxes optimized for maximum recall
 		return get_boxes(centers, labs, optimize=True, grad=grad), centers, labs
@@ -116,10 +145,9 @@ def simple_boxes(im, grad, **kwargs):
 def get_parts(im, grad, xp=np,
 	swap_channels=True,
 	alpha=0.5, gamma=1.0, sigma=1,
-	peak_size=None, K=None, init_from_maximas=False):
+	peak_size=None, **kwargs):
 
 	grad = grad_correction(grad, xp, sigma, gamma, swap_channels)
-	boxes, centers, labs = optimal_boxes(im, grad,
-		K=K, init_from_maximas=init_from_maximas)
+	boxes, centers, labs = optimal_boxes(im, grad, **kwargs)
 
 	return boxes

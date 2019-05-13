@@ -24,7 +24,7 @@ from chainer_addons.utils.imgproc import _center_crop
 from chainer.cuda import to_cpu
 from chainer.dataset.convert import concat_examples
 
-from l1_svm_parts.utils import arguments, IdentityScaler
+from l1_svm_parts.utils import arguments, IdentityScaler, ClusterInitType
 from l1_svm_parts.core.visualization import show_feature_saliency, visualize_coefs
 from l1_svm_parts.core.extraction import extract_parts, parts_to_file
 
@@ -74,8 +74,8 @@ def main(args):
 	if args.trained_svm:
 		trained_svm = args.trained_svm
 
-	logging.info("Loading SVM from \"{}\"".format(args.trained_svm))
-	clf = joblib.load(args.trained_svm)
+	logging.info("Loading SVM from \"{}\"".format(trained_svm))
+	clf = joblib.load(trained_svm)
 
 	COEFS = clf.coef_
 
@@ -197,7 +197,8 @@ def main(args):
 			gamma=args.gamma,
 			sigma=args.sigma,
 			K=args.K,
-			init_from_maximas=args.init_from_maximas
+			thresh_type=args.thresh_type,
+			cluster_init=ClusterInitType.MAXIMAS,
 		)
 
 

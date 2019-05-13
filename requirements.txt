@@ -12,5 +12,5 @@ cupy-cuda92~=4.2.0
 
 # my own packages
 cvargparse~=0.1.5
-cvdatasets~=0.4.1
+cvdatasets~=0.4.2
 chainer_addons~=0.5.2

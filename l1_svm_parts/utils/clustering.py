@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.cluster import KMeans
-from skimage.feature import peak_local_max
+
+from l1_svm_parts.utils import ClusterInitType
 
 def _norm(arr):
 	arr = arr - arr.min()
@@ -10,37 +11,59 @@ def _norm(arr):
 	else:
 		return arr / arr_max
 
-def _as_cluster_feats(im, grad, coords):
+def _as_cluster_feats(im, grad, coords, feature_composition=None):
 	ys, xs = coords
 	_im = im[ys, xs]
-	return np.stack([
-		_norm(ys),
-		_norm(xs),
-		_norm(grad[ys, xs].ravel()),
-		_norm(_im[:, 0].ravel()),
-		_norm(_im[:, 1].ravel()),
-		_norm(_im[:, 2].ravel()),
-	]).transpose()
 
-def cluster_gradient(im, grad, K=4, thresh=None, init_from_maximas=False):
+	composition = dict(
+		coords=[_norm(ys), _norm(xs)],
+		grad=[_norm(grad[ys, xs].ravel())],
+		RGB=[_norm(_im[:, i].ravel()) for i in range(3)],
+	)
+
+	if feature_composition is None:
+
+		feature_composition = ["coords", "grad", "RGB"]
+
+	cluster_feats = []
+	for key in feature_composition:
+		assert key in composition
+		cluster_feats.extend(composition[key])
+
+	return np.stack(cluster_feats).transpose()
+
+
+
+def cluster_gradient(im, grad, K=4,
+	thresh=None, cluster_init=ClusterInitType.Default,
+	feature_composition=["coords"]):
 	assert K is not None and K > 0, "Positive K is required!"
 
+
+	cluster_init = ClusterInitType.get(cluster_init)
+	init_coords = cluster_init(grad, K)
+
+	if init_coords is None:
+		clf = KMeans(K)
+	else:
+		init = _as_cluster_feats(im, grad, init_coords, feature_composition)
+		clf = KMeans(K, init=init, n_init=1)
+
+
 	### get x,y coordinates
-	if thresh is None:
+	if isinstance(thresh, (int, float)):
+		coords = np.where(np.abs(grad) >= thresh)
+	elif isinstance(thresh, np.ndarray):
+		# thresh is a mask
+		coords = np.where(thresh)
+	else:
 		idxs = np.arange(np.multiply(*grad.shape))
 		coords = np.unravel_index(idxs, grad.shape)
-	else:
-		coords = np.where(np.abs(grad) >= thresh)
+	data = _as_cluster_feats(im, grad, coords, feature_composition)
 
-	if init_from_maximas:
-		init_coords = peak_local_max(grad, num_peaks=K).T
-		init = _as_cluster_feats(im, grad, init_coords)
-		clf = KMeans(K, init=init, n_init=1)
-	else:
-		clf = KMeans(K)
 
-	data = _as_cluster_feats(im, grad, coords)
 	clf.fit(data)
+
 	labels = np.full(grad.shape, np.nan)
 	labels[coords] = clf.labels_
 	centers = clf.cluster_centers_.copy()

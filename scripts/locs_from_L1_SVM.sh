@@ -17,7 +17,6 @@ OPTS="${OPTS} --n_jobs $N_JOBS"
 OPTS="${OPTS} --prepare_type $PREPARE_TYPE"
 
 # OPTS="${OPTS} --scale_features"
-OPTS="${OPTS} --init_from_maximas"
 
 SCRIPT="../part_locations_from_L1_SVM.py"
 

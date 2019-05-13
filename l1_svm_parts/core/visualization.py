@@ -45,8 +45,7 @@ def visualize_coefs(coefs, **kwargs):
 def plot_gradient(im, grad, xp=np, ax=None, title="",
 	swap_channels=True,
 	alpha=0.5, gamma=1.0, sigma=1,
-	peak_size=None, K=None, init_from_maximas=False):
-
+	peak_size=None, K=None, **kwargs):
 	grad = grad_correction(grad, xp, sigma, gamma, swap_channels)
 
 	if ax is None:
@@ -56,14 +55,13 @@ def plot_gradient(im, grad, xp=np, ax=None, title="",
 	ax = imshow(np.zeros_like(im), ax=ax)
 
 	ax = imshow(grad, ax=ax,
-				cmap=plt.cm.viridis, alpha=alpha)
+				cmap=plt.cm.gray, alpha=alpha)
 
 	cmap = plt.cm.jet
 	if K is not None and K > 0:
 
 		boxes, centers, labs = optimal_boxes(im, grad,
-			K=K,
-			init_from_maximas=init_from_maximas)
+			K=K, **kwargs)
 
 		for c, box in boxes:
 			ax.add_patch(Rectangle(
@@ -71,8 +69,7 @@ def plot_gradient(im, grad, xp=np, ax=None, title="",
 				color=cmap(c / len(boxes))))
 
 		boxes, centers, labs = simple_boxes(im, grad,
-			K=K,
-			init_from_maximas=init_from_maximas)
+			K=K, **kwargs)
 
 		for c, box in boxes:
 			ax.add_patch(Rectangle(

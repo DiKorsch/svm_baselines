@@ -21,9 +21,10 @@ from cvdatasets.annotations import AnnotationType
 from baselines.utils import arguments, visualization
 
 class CNN_Wrapper(object):
-	def __init__(self, model):
+	def __init__(self, model, label_shift):
 		super(CNN_Wrapper, self).__init__()
 		self.clf = model.clf_layer
+		self.label_shift = label_shift
 
 	def predict(self, feat):
 		logit = self.clf(feat).array
@@ -31,7 +32,7 @@ class CNN_Wrapper(object):
 
 	def score(self, X, y):
 		logits = self.clf(X).array
-		return (logits.argmax(axis=1) == y).mean()
+		return (logits.argmax(axis=1) == (y + self.label_shift)).mean()
 
 
 def load_CNN(args, annot):
@@ -51,7 +52,7 @@ def load_CNN(args, annot):
 		n_classes=part_info.n_classes + args.label_shift,
 		weights=args.weights)
 
-	return CNN_Wrapper(model)
+	return CNN_Wrapper(model, args.label_shift)
 
 def load_sklearn(args, annot):
 	return joblib.load(args.weights)
@@ -64,6 +65,7 @@ def load_clf(args, annot):
 			clf = loader(args, annot)
 			break
 		except Exception as e:
+			logging.debug(e)
 			pass
 
 	else:
