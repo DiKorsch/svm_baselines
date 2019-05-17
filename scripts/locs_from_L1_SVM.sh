@@ -27,7 +27,8 @@ if [[ -z $DATASET ]]; then
 	exit -1
 fi
 
-TRAINED_SVM="../.out/clf_svm_${DATASET}_GLOBAL.${MODEL_TYPE}_glob_only_sparse_coefs.npz"
+SVM_OUTPUT=${SVM_OUTPUT:-"../.out"}
+TRAINED_SVM="${SVM_OUTPUT}/clf_svm_${DATASET}_GLOBAL.${MODEL_TYPE}_glob_only_sparse_coefs.npz"
 
 $PYTHON $SCRIPT \
 	${DATA} \

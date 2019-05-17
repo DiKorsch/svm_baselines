@@ -106,10 +106,15 @@ def main(args):
 	if not isinstance(size, tuple):
 		size = (size, size)
 
-	_prepare = partial(PrepareType[args.prepare_type](model),
-			swap_channels=args.swap_channels)
+	_prepare = PrepareType[args.prepare_type](model)
 
-	prepare = lambda im: _center_crop(_prepare(im), size)
+	if args.no_center_crop_on_val:
+		prepare = lambda im: _prepare(im,
+			swap_channels=args.swap_channels,
+			keep_ratio=False)
+	else:
+		prepare = lambda im: _center_crop(_prepare(im, swap_channels=args.swap_channels), size)
+
 
 	logging.info("Created {} model with \"{}\" prepare function. Image input size: {}"\
 		.format(

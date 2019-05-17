@@ -1,7 +1,7 @@
 import numpy as np
 import logging
 
-from functools import partial
+from functools import partial, wraps
 from scipy.optimize import minimize, Bounds
 
 from l1_svm_parts.utils import ClusterInitType
@@ -39,12 +39,38 @@ def _check_min_bbox(bbox, min_bbox):
 	logging.debug("=" * len(text))
 	return bbox
 
-def fit_bbox(mask, grad=None, optimize=False, min_bbox=10):
+class EnlargeBbox(object):
+	def __init__(self, factor):
+		self.factor = factor
+
+	def __call__(self, func):
+
+		@wraps(func)
+		def inner(mask, *args, **kwargs):
+			im_h, im_w = mask.shape
+			bbox = func(mask, *args, **kwargs)
+			if self.factor <= 0:
+				return bbox
+
+			y0, x0, y1, x1 = bbox
+
+			w, h = x1 - x0, y1 - y0
+			dx = w * self.factor / 2
+			dy = h * self.factor / 2
+
+			y0, x0 = max(y0 - dy, 0), max(x0 - dx, 0)
+			y1, x1 = min(y1 + dy, im_h), min(x1 + dx, im_w)
+			return y0, x0, y1, x1
+		return inner
+
+
+
+@EnlargeBbox(factor=0.2)
+def fit_bbox(mask, grad=None, optimize=False, min_bbox=64):
 	ys, xs = np.where(mask)
 	bbox = np.array([min(ys), min(xs), max(ys), max(xs)])
 
 	bbox = _check_min_bbox(bbox, min_bbox)
-
 	if not optimize:
 		return bbox
 
@@ -79,7 +105,7 @@ def fit_bbox(mask, grad=None, optimize=False, min_bbox=10):
 		FN = mask.sum() - TP
 		TN = (1-mask).sum() - FP
 
-		ratio = 1
+		# ratio = 1
 		return TP, FP, FN, TN, ratio
 
 	def Recall(b, mask):
@@ -122,6 +148,7 @@ def get_boxes(centers, labels, **kwargs):
 
 def _boxes(im, grad, optimal=True,
 	thresh_type=ThresholdType.Default,
+	min_bbox=64,
 	**kwargs):
 
 	thresh_type = ThresholdType.get(thresh_type)
@@ -132,9 +159,9 @@ def _boxes(im, grad, optimal=True,
 
 	if optimal:
 		# Boxes optimized for maximum recall
-		return get_boxes(centers, labs, optimize=True, grad=grad), centers, labs
+		return get_boxes(centers, labs, optimize=True, grad=grad, min_bbox=min_bbox), centers, labs
 	else:
-		return get_boxes(centers, labs, optimize=False), centers, labs
+		return get_boxes(centers, labs, optimize=False, min_bbox=min_bbox), centers, labs
 
 def optimal_boxes(im, grad, **kwargs):
 	return _boxes(im, grad, optimal=True, **kwargs)
@@ -146,6 +173,12 @@ def get_parts(im, grad, xp=np,
 	swap_channels=True,
 	alpha=0.5, gamma=1.0, sigma=1,
 	peak_size=None, **kwargs):
+
+	# hack if the gradient is not present
+	if (grad == 0).all():
+		h, w, c = im.shape
+		middle = (h//2, w//2)
+		return [[i, (middle, h//2, w//2)] for i in range(kwargs["K"])]
 
 	grad = grad_correction(grad, xp, sigma, gamma, swap_channels)
 	boxes, centers, labs = optimal_boxes(im, grad, **kwargs)

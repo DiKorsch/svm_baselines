@@ -11,6 +11,10 @@ def extract_parts(model, coefs, ims, labs, feats, topk_preds,
 	swap_channels=True,
 	**kwargs):
 
+	# for i, lab in enumerate(labs):
+	# 	mock_parts = [[i, ((10, 10), 100, 100)] for i in range(kwargs["K"])]
+	# 	yield mock_parts, mock_parts
+
 	normalize_grads = False
 	preds = topk_preds[:, -1]
 
@@ -29,7 +33,6 @@ def extract_parts(model, coefs, ims, labs, feats, topk_preds,
 	for i, (gt_coef, pred_coef) in enumerate(zip(gt_coefs, pred_coefs)):
 		im = prepare_back(ims[i])
 
-		#gt_parts = _get_parts(im, pred_im_grad[i])
 		pred_parts = _get_parts(im, pred_im_grad[i])
 		full_parts = _get_parts(im, full_im_grad[i])
 		yield pred_parts, full_parts

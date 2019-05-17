@@ -55,7 +55,8 @@ def plot_gradient(im, grad, xp=np, ax=None, title="",
 	ax = imshow(np.zeros_like(im), ax=ax)
 
 	ax = imshow(grad, ax=ax,
-				cmap=plt.cm.gray, alpha=alpha)
+				cmap=plt.cm.gray_r,
+				alpha=alpha)
 
 	cmap = plt.cm.jet
 	if K is not None and K > 0:

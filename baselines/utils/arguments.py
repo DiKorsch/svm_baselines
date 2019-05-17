@@ -36,7 +36,10 @@ def train_args():
 
 		Arg("--sparse", action="store_true",
 			help="Use LinearSVC with L1 regularization for sparse feature selection"),
+
 		Arg("--scale_features", action="store_true"),
+		Arg("--l2_norm", action="store_true"),
+
 		Arg("--eval_local_parts", action="store_true"),
 		Arg("--no_dump", action="store_true"),
 

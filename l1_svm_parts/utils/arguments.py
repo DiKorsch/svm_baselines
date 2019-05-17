@@ -39,6 +39,7 @@ def parse_args():
 
 			Arg("--label_shift", type=int, default=1),
 
+			Arg("--no_center_crop_on_val", action="store_true"),
 			Arg("--swap_channels", action="store_true",
 				help="preprocessing option: swap channels from RGB to BGR"),
 

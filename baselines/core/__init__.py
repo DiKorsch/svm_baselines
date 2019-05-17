@@ -17,9 +17,17 @@ def _dump(opts, clf, key, suffix):
 
 	return joblib.dump(clf, fpath)
 
+def l2_norm_feats(feats):
+	assert feats.ndim == 3, "Wrong number of dimensions!"
+	l2_norm = np.sqrt((feats ** 2).sum(axis=-1, keepdims=True))
+	feats /= l2_norm
 
 def evaluate(opts, train, val, key):
 	n_parts = train.features.shape[1]
+
+	if opts.l2_norm:
+		l2_norm_feats(train.features)
+		l2_norm_feats(val.features)
 
 	if n_parts == 1:
 		evaluate_global(opts, train, val, key)
@@ -142,6 +150,14 @@ def evaluate_global(opts, train, val, key):
 		scale=opts.scale_features)
 
 	logging.info("Accuracy {}: {:.2%}".format(suffix, score))
+	if opts.sparse:
+		sparsity = (clf.coef_ != 0).sum(axis=1)
+		n_feats = clf.coef_.shape[1]
+
+		logging.info("===== Feature selection sparsity ====")
+		logging.info(f"Absolute:   {sparsity.mean():.2f} +/- {sparsity.std():.4f}".format())
+		logging.info(f"Percentage: {sparsity.mean()/n_feats:.2%} +/- {sparsity.std()/n_feats:.4%}".format())
+		logging.info("=====================================")
 
 	if not opts.no_dump:
 		_dump(opts, clf, key=key, suffix=suffix)
