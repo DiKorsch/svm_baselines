@@ -2,6 +2,7 @@ import numpy as np
 import chainer.functions as F
 
 from skimage.feature import peak_local_max
+from skimage.filters import threshold_otsu
 
 from cvargparse.utils.enumerations import BaseChoiceType
 
@@ -38,6 +39,7 @@ class ThresholdType(BaseChoiceType):
 	NONE = 0
 	MEAN = 1
 	PRECLUSTER = 2
+	OTSU = 3
 
 	Default = PRECLUSTER
 
@@ -59,6 +61,9 @@ class ThresholdType(BaseChoiceType):
 			# 1th cluster represents the cluster around the maximal peak
 			return labs == 1
 
+		elif self == ThresholdType.OTSU:
+			thresh = threshold_otsu(grad)
+			return grad > thresh
 		else:
 			return None
 

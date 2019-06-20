@@ -4,7 +4,6 @@ import logging
 from functools import partial, wraps
 from scipy.optimize import minimize, Bounds
 
-from l1_svm_parts.utils import ClusterInitType
 from l1_svm_parts.utils import ThresholdType
 from l1_svm_parts.utils.image import grad_correction
 from l1_svm_parts.utils.clustering import cluster_gradient
@@ -65,7 +64,7 @@ class EnlargeBbox(object):
 
 
 
-@EnlargeBbox(factor=0.2)
+# @EnlargeBbox(factor=0.2)
 def fit_bbox(mask, grad=None, optimize=False, min_bbox=64):
 	ys, xs = np.where(mask)
 	bbox = np.array([min(ys), min(xs), max(ys), max(xs)])
@@ -137,13 +136,20 @@ def fit_bbox(mask, grad=None, optimize=False, min_bbox=64):
 	bbox = _check_min_bbox(bbox, min_bbox)
 	return bbox
 
-def get_boxes(centers, labels, **kwargs):
+def get_boxes(centers, labels, fit_object=False, **kwargs):
 	values = labels[np.logical_not(np.isnan(labels))]
 	res = []
 	for i in np.unique(values):
 		y0, x0, y1, x1 = fit_bbox(labels == i, **kwargs)
 		h, w = y1 - y0, x1 - x0
 		res.append([i, ((x0, y0), w, h)])
+
+	if fit_object:
+		obj_mask = np.logical_not(np.isnan(labels))
+		y0, x0, y1, x1 = fit_bbox(obj_mask, **kwargs)
+		h, w = y1 - y0, x1 - x0
+		res.append([i + 1, ((x0, y0), w, h)])
+
 	return res
 
 def _boxes(im, grad, optimal=True,

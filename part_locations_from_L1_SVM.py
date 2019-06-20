@@ -83,12 +83,12 @@ def main(args):
 		logging.info("Visualizing coefficients...")
 		visualize_coefs(clf.coef_, figsize=(16, 9*3))
 
+	_topk_decision = partial(topk_decision, clf=clf, k=args.topk)
 	for _data, subset in [(train_data, "training"), (val_data, "validation")]:
 		X = scaler.transform(_data.features[:, -1])
 		y = _data.labels
 		logging.info("Accuracy on {} subset: {:.4%}".format(subset, clf.score(X, y)))
 
-		_topk_decision = partial(topk_decision, clf=clf, k=args.topk)
 
 		topk_preds, topk_accu = _topk_decision(X, y)
 		logging.info("Top{}-Accuracy on {} subset: {:.4%}".format(args.topk, subset, topk_accu))
@@ -202,8 +202,15 @@ def main(args):
 			gamma=args.gamma,
 			sigma=args.sigma,
 			K=args.K,
+			alpha=1,
 			thresh_type=args.thresh_type,
 			cluster_init=ClusterInitType.MAXIMAS,
+
+			feature_composition=[
+				"coords",
+				# "grad",
+				# "RGB"
+			]
 		)
 
 
