@@ -20,7 +20,7 @@ def train_args():
 			help="type of the model"),
 
 		Arg("--classifier", "-clf", default="svm",
-			choices=["svm", "logreg"]),
+			choices=["svm", "logreg", "fv"]),
 
 		Arg("--C", type=float, default=0.1,
 			help="classifier regularization parameter"),
