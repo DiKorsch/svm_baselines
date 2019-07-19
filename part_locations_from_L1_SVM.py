@@ -231,5 +231,6 @@ def main(args):
 		pred_out.close()
 		full_out.close()
 
+chainer.global_config.cv_resize_backend = "PIL"
 with chainer.using_config("train", False):
 	main(arguments.parse_args())
