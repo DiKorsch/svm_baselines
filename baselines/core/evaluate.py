@@ -71,8 +71,10 @@ def evaluate_global(opts, train, val, key):
 		n_feats = clf.coef_.shape[1]
 
 		logging.info("===== Feature selection sparsity ====")
-		logging.info(f"Absolute:   {sparsity.mean():.2f} +/- {sparsity.std():.4f}".format())
-		logging.info(f"Percentage: {sparsity.mean()/n_feats:.2%} +/- {sparsity.std()/n_feats:.4%}".format())
+		logging.info("Absolute:   {:.2f} +/- {:.4f}".format(
+			sparsity.mean(), sparsity.std()))
+		logging.info("Percentage: {:.2%} +/- {:.4%}".format(
+			sparsity.mean()/n_feats, sparsity.std()/n_feats))
 		logging.info("=====================================")
 
 	if not opts.no_dump:

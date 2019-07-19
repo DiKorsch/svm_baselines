@@ -32,7 +32,7 @@ def _check_min_bbox(bbox, min_bbox):
 		bbox[2] -= dy
 		bbox[3] -= dx
 
-	text = f"Adjusted bbox from {old_bbox} to {bbox}"
+	text = "Adjusted bbox from {} to {}".format(old_bbox, bbox)
 	logging.debug("=" * len(text))
 	logging.debug(text)
 	logging.debug("=" * len(text))

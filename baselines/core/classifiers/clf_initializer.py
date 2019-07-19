@@ -46,8 +46,9 @@ class ClfInitializer(object):
 
 	def dump(self, output, key, suffix):
 
-		fpath = join(output, f"clf_{self.name}_{key}_{suffix}.npz")
-		logging.info(f"Dumping {self.__class__.__name__} classifier to \"{fpath}\"")
+		fpath = join(output, "clf_{}_{}_{}.npz".format(self.name, key, suffix))
+		logging.info("Dumping {} classifier to \"{}\"".format(
+			self.__class__.__name__, fpath))
 
 		return joblib.dump(self, fpath)
 
@@ -84,4 +85,4 @@ class ClfInitializer(object):
 				**kwargs)
 
 		else:
-			raise ValueError(f"Unknown Classifier: {opts.classifier}")
+			raise ValueError("Unknown Classifier: {}".format(opts.classifier))

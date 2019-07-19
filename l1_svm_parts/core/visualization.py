@@ -137,7 +137,7 @@ def plot_gradient(im, grad, xp=np, ax=None, title="",
 			x,y,w,h = map(int, [x,y,w,h])
 			_ax.axis("off")
 			_ax.imshow(im[y:y+h, x:x+w])
-			_ax.set_title(f"Part #{i+1}")
+			_ax.set_title("Part #{}".format(i+1))
 
 	if peak_size is not None:
 		peaks = peak_local_max(
