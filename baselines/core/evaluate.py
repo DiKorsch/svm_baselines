@@ -16,16 +16,16 @@ def evaluate_parts(opts, train, val, key, shuffle=False):
 		if shuffle:
 			suffix += "_shuffled"
 
-		clf_class = ClfInitializer.new(opts)
+		class_init = ClfInitializer.new(opts)
 
-		clf, score = train_score(X, y, X_val, y_val, clf_class,
+		clf, score = train_score(X, y, X_val, y_val, class_init,
 			n_parts=train_feats.shape[1],
 			scale=opts.scale_features)
 
 		logging.info("Accuracy {}: {:.4%}".format(suffix, score))
 
 		if not opts.no_dump:
-			clf.dump(opts.output, key=key, suffix=suffix)
+			class_init.dump(clf, opts.output, key=key, suffix=suffix)
 
 	if shuffle:
 		logging.info("Shuffling features")
@@ -59,9 +59,9 @@ def evaluate_global(opts, train, val, key):
 		suffix += "_sparse_coefs"
 		opts.classifier = "svm"
 
-	clf_class = ClfInitializer.new(opts)
+	class_init = ClfInitializer.new(opts)
 
-	clf, score = train_score(X, y, X_val, y_val, clf_class,
+	clf, score = train_score(X, y, X_val, y_val, class_init,
 		n_parts=1,
 		scale=opts.scale_features)
 
@@ -78,7 +78,7 @@ def evaluate_global(opts, train, val, key):
 		logging.info("=====================================")
 
 	if not opts.no_dump:
-		clf.dump(opts.output, key=key, suffix=suffix)
+		class_init.dump(clf, opts.output, key=key, suffix=suffix)
 
 
 def l2_norm_feats(feats):

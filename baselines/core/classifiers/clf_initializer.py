@@ -44,13 +44,13 @@ class ClfInitializer(object):
 
 		return clf
 
-	def dump(self, output, key, suffix):
+	def dump(self, clf, output, key, suffix):
 
 		fpath = join(output, "clf_{}_{}_{}.npz".format(self.name, key, suffix))
 		logging.info("Dumping {} classifier to \"{}\"".format(
-			self.__class__.__name__, fpath))
+			clf.__class__.__name__, fpath))
 
-		return joblib.dump(self, fpath)
+		return joblib.dump(clf, fpath)
 
 	@classmethod
 	def new(cls, opts):

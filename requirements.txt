@@ -6,6 +6,8 @@ imageio~=2.3.0
 PyYAML~=5.1
 simplejson~=3.14
 sacred~=0.7.4
+scikit-learn~=0.20.0
+cyvlfeat~=0.4.0
 
 chainer~=4.2.0
 cupy-cuda92~=4.2.0
@@ -13,4 +15,4 @@ cupy-cuda92~=4.2.0
 # my own packages
 cvargparse~=0.1.5
 cvdatasets~=0.4.2
-chainer_addons~=0.5.2
+chainer_addons~=0.6.0
