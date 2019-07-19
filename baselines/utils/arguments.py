@@ -4,7 +4,8 @@ from cvargparse import BaseParser, Arg
 
 from cvdatasets.utils import read_info_file
 
-DEFAULT_INFO_FILE="/home/korsch/Data/info.yml"
+import os
+DEFAULT_INFO_FILE=os.environ.get("DATA", "/home/korsch/Data/info.yml")
 
 info_file = read_info_file(DEFAULT_INFO_FILE)
 
