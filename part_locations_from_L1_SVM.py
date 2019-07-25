@@ -55,6 +55,11 @@ def main(args):
 	data = annot.new_dataset(subset=None)
 	train_data, val_data = map(annot.new_dataset, ["train", "test"])
 
+	n_classes = part_info.n_classes + args.label_shift
+
+	if annot.labels.max() > n_classes:
+		_, annot.labels = np.unique(annot.labels, return_inverse=True)
+
 	assert train_data.features is not None and val_data.features is not None, \
 		"Features are not loaded!"
 
@@ -87,8 +92,8 @@ def main(args):
 	for _data, subset in [(train_data, "training"), (val_data, "validation")]:
 		X = scaler.transform(_data.features[:, -1])
 		y = _data.labels
-		logging.info("Accuracy on {} subset: {:.4%}".format(subset, clf.score(X, y)))
-
+		pred = clf.decision_function(X).argmax(axis=1)
+		logging.info("Accuracy on {} subset: {:.4%}".format(subset, (pred == y).mean()))
 
 		topk_preds, topk_accu = _topk_decision(X, y)
 		logging.info("Top{}-Accuracy on {} subset: {:.4%}".format(args.topk, subset, topk_accu))
@@ -140,7 +145,7 @@ def main(args):
 
 	logging.info("Loading \"{}\" weights from \"{}\"".format(
 		model_info.class_key, weights))
-	model.load_for_inference(n_classes=part_info.n_classes + args.label_shift, weights=weights)
+	model.load_for_inference(n_classes=n_classes, weights=weights)
 
 	GPU = args.gpu[0]
 	if GPU >= 0:
