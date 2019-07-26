@@ -118,7 +118,10 @@ def main(args):
 			swap_channels=args.swap_channels,
 			keep_ratio=False)
 	else:
-		prepare = lambda im: _center_crop(_prepare(im, swap_channels=args.swap_channels), size)
+		prepare = lambda im: _center_crop(
+				_prepare(im,
+					size=size,
+					swap_channels=args.swap_channels), size)
 
 
 	logging.info("Created {} model with \"{}\" prepare function. Image input size: {}"\
@@ -164,11 +167,19 @@ def main(args):
 			"For extraction output files are required!"
 		pred_out, full_out = [open(out, "w") for out in args.extract]
 	else:
+		logging.warning("Extraction is disabled!")
 		pred_out, full_out = None, None
 
 	min_label = data.labels.min()
 
 	logging.info("Minimum label value is \"{}\"".format(min_label))
+
+	feature_composition = [
+		"coords",
+		"grad",
+		"RGB"
+	]
+	logging.info("Using following feature composition: {}".format(feature_composition))
 
 	for batch_i, batch in tqdm(enumerate(it), total=n_batches):
 
@@ -211,12 +222,9 @@ def main(args):
 			thresh_type=args.thresh_type,
 			cluster_init=ClusterInitType.MAXIMAS,
 
-			feature_composition=[
-				"coords",
-				# "grad",
-				# "RGB"
-			]
+			feature_composition=feature_composition
 		)
+
 
 
 		if args.extract:
