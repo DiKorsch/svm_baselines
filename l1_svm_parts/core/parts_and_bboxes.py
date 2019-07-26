@@ -136,17 +136,26 @@ def fit_bbox(mask, grad=None, optimize=False, min_bbox=64):
 	bbox = _check_min_bbox(bbox, min_bbox)
 	return bbox
 
-def get_boxes(centers, labels, fit_object=False, **kwargs):
+def get_boxes(centers, labels, K, fit_object=False, **kwargs):
 	values = labels[np.logical_not(np.isnan(labels))]
+	obj_mask = np.logical_not(np.isnan(labels))
+	obj_box = fit_bbox(obj_mask, **kwargs)
+
 	res = []
-	for i in np.unique(values):
-		y0, x0, y1, x1 = fit_bbox(labels == i, **kwargs)
+	for i in range(K):
+		mask = labels == i
+		if mask.sum() == 0:
+			# if there is no cluster for this label,
+			# then take the extend of the whole object
+			y0, x0, y1, x1 = obj_box
+		else:
+			y0, x0, y1, x1 = fit_bbox(mask, **kwargs)
+
 		h, w = y1 - y0, x1 - x0
 		res.append([i, ((x0, y0), w, h)])
 
 	if fit_object:
-		obj_mask = np.logical_not(np.isnan(labels))
-		y0, x0, y1, x1 = fit_bbox(obj_mask, **kwargs)
+		y0, x0, y1, x1 = obj_box
 		h, w = y1 - y0, x1 - x0
 		res.append([i + 1, ((x0, y0), w, h)])
 
@@ -154,20 +163,22 @@ def get_boxes(centers, labels, fit_object=False, **kwargs):
 
 def _boxes(im, grad, optimal=True,
 	thresh_type=ThresholdType.Default,
-	min_bbox=64,
+	min_bbox=64, K=4,
 	**kwargs):
 
 	thresh_type = ThresholdType.get(thresh_type)
 	centers, labs = cluster_gradient(
 		im, grad,
 		thresh=thresh_type(im, grad),
+		K=K,
 		**kwargs)
 
+	box_kwargs = dict(optimize=optimal, min_bbox=min_bbox, K=K)
 	if optimal:
 		# Boxes optimized for maximum recall
-		return get_boxes(centers, labs, optimize=True, grad=grad, min_bbox=min_bbox), centers, labs
-	else:
-		return get_boxes(centers, labs, optimize=False, min_bbox=min_bbox), centers, labs
+		box_kwargs["grad"] = grad
+
+	return get_boxes(centers, labs, **box_kwargs), centers, labs
 
 def optimal_boxes(im, grad, **kwargs):
 	return _boxes(im, grad, optimal=True, **kwargs)
