@@ -11,7 +11,9 @@ from tqdm import tqdm
 from sklearn.preprocessing import MinMaxScaler
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
+
 from functools import partial
+from contextlib import contextmanager
 
 from cvdatasets.annotations import AnnotationType
 from cvdatasets.utils import new_iterator
@@ -28,12 +30,19 @@ from l1_svm_parts.utils import arguments, IdentityScaler, ClusterInitType
 from l1_svm_parts.core.visualization import show_feature_saliency, visualize_coefs
 from l1_svm_parts.core.extraction import extract_parts, parts_to_file
 
+@contextmanager
+def outputs(args):
+	if args.extract:
+		assert args.extract is not None, \
+			"For extraction output files are required!"
+		outputs = [open(out, "w") for out in args.extract]
+		yield outputs
+		[out.close for out in outputs]
+	else:
+		logging.warning("Extraction is disabled!")
+		yield None, None
 
-def topk_decision(X, y, clf, k):
-	decs = clf.decision_function(X)
-	topk_preds = np.argsort(decs)[:, -k:]
-	topk_accu = (topk_preds == np.expand_dims(y, 1)).max(axis=1).mean()
-	return topk_preds, topk_accu
+
 
 def new_model(args, model_info, n_classes):
 
@@ -90,9 +99,52 @@ def new_model(args, model_info, n_classes):
 
 	return model, prepare
 
+def topk_decision(X, y, clf, topk):
+	decs = clf.decision_function(X)
+	topk_preds = np.argsort(decs)[:, -topk:]
+	topk_accu = (topk_preds == np.expand_dims(y, 1)).max(axis=1).mean()
+	return topk_preds, topk_accu
+
+def evaluate_batch(feats, gt, clf, topk):
+
+	topk_preds, topk_accu = topk_decision(feats, gt, clf=clf, topk=topk)
+
+	logging.debug("Batch Accuracy: {:.4%} (Top1) | {:.4%} (Top{}) {: 3d} / {: 3d}".format(
+
+		np.mean(topk_preds[:, -1] == gt),
+		topk_accu,
+
+		topk,
+		np.sum(topk_preds[:, -1] == gt),
+		len(feats)
+	))
+
+	return topk_preds
 
 
-def main(args):
+def evaluate_data(clf, data, subset, topk, scaler):
+
+	X = scaler.transform(data.features[:, -1])
+	y = data.labels
+	pred = clf.decision_function(X).argmax(axis=1)
+	logging.info("Accuracy on {} subset: {:.4%}".format(subset, (pred == y).mean()))
+
+	topk_preds, topk_accu = topk_decision(X, y, clf=clf, topk=topk)
+	logging.info("Top{}-Accuracy on {} subset: {:.4%}".format(topk, subset, topk_accu))
+
+def load_svm(args):
+
+	logging.info("Loading SVM from \"{}\"".format(args.trained_svm))
+	clf = joblib.load(args.trained_svm)
+
+	if args.visualize_coefs:
+		logging.info("Visualizing coefficients...")
+		visualize_coefs(clf.coef_, figsize=(16, 9*3))
+
+	return clf
+
+def init_data(args, clf=None):
+
 	annot_cls = AnnotationType.get(args.dataset).value
 	parts_key = "{}_{}".format(args.dataset, "GLOBAL")
 
@@ -100,22 +152,21 @@ def main(args):
 		annot_cls, args.data))
 	logging.info("Using \"{}\"-parts".format(parts_key))
 
-	annot = annot_cls(args.data,
-		parts=parts_key,
-		feature_model=args.model_type
-	)
+	annot = annot_cls(args.data, parts=parts_key, feature_model=args.model_type)
 
 	data_info = annot.info
 	model_info = data_info.MODELS[args.model_type]
 	part_info = data_info.PARTS[parts_key]
 
+	n_classes = part_info.n_classes + args.label_shift
+
 	data = annot.new_dataset(subset=None)
 	train_data, val_data = map(annot.new_dataset, ["train", "test"])
 
-	n_classes = part_info.n_classes + args.label_shift
-
 	if annot.labels.max() > n_classes:
 		_, annot.labels = np.unique(annot.labels, return_inverse=True)
+
+	logging.info("Minimum label value is \"{}\"".format(data.labels.min()))
 
 	assert train_data.features is not None and val_data.features is not None, \
 		"Features are not loaded!"
@@ -130,117 +181,91 @@ def main(args):
 	else:
 		scaler = IdentityScaler()
 
-	trained_svm = args.trained_svm
-	logging.info("Loading SVM from \"{}\"".format(trained_svm))
-	clf = joblib.load(trained_svm)
+	it, n_batches = new_iterator(data,
+		args.n_jobs, args.batch_size,
+		repeat=False, shuffle=False
+	)
+	it = tqdm(enumerate(it), total=n_batches)
 
-	if args.visualize_coefs:
-		logging.info("Visualizing coefficients...")
-		visualize_coefs(clf.coef_, figsize=(16, 9*3))
+	if clf is not None:
+		for _data, subset in [(train_data, "training"), (val_data, "validation")]:
+			evaluate_data(clf, _data, subset, args.topk, scaler)
 
-	_topk_decision = partial(topk_decision, clf=clf, k=args.topk)
-	for _data, subset in [(train_data, "training"), (val_data, "validation")]:
-		X = scaler.transform(_data.features[:, -1])
-		y = _data.labels
-		pred = clf.decision_function(X).argmax(axis=1)
-		logging.info("Accuracy on {} subset: {:.4%}".format(subset, (pred == y).mean()))
+	return scaler, it, model_info, n_classes
 
-		topk_preds, topk_accu = _topk_decision(X, y)
-		logging.info("Top{}-Accuracy on {} subset: {:.4%}".format(args.topk, subset, topk_accu))
 
-	model, prepare = new_model(args, model_info, n_classes)
+feature_composition = [
+	"coords",
+	# "grad",
+	# "RGB"
+]
+
+def main(args):
+	global feature_composition
+
+	clf = load_svm(args)
+
+	scaler, it, *model_args = init_data(args, clf)
+
+	model, prepare = new_model(args, *model_args)
 
 	GPU = args.gpu[0]
 	if GPU >= 0:
 		chainer.cuda.get_device(GPU).use()
 		model.to_gpu(GPU)
 
-	it, n_batches = new_iterator(data,
-		args.n_jobs, args.batch_size,
-		repeat=False, shuffle=False
-	)
-
-
-	if args.extract:
-		assert args.extract is not None, \
-			"For extraction output files are required!"
-		pred_out, full_out = [open(out, "w") for out in args.extract]
-	else:
-		logging.warning("Extraction is disabled!")
-		pred_out, full_out = None, None
-
-	min_label = data.labels.min()
-
-	logging.info("Minimum label value is \"{}\"".format(min_label))
-
-	feature_composition = [
-		"coords",
-		# "grad",
-		# "RGB"
-	]
-
 	logging.info("Using following feature composition: {}".format(feature_composition))
 
-	for batch_i, batch in tqdm(enumerate(it), total=n_batches):
+	with outputs(args) as (pred_out, full_out):
 
-		batch = [(prepare(im), lab) for im, _, lab in batch]
-		X, y = concat_examples(batch, device=GPU)
+		for batch_i, batch in it:
 
-		ims = chainer.Variable(X)
-		feats = model(ims, layer_name=model.meta.feature_layer)
+			batch = [(prepare(im), lab) for im, _, lab in batch]
+			X, y = concat_examples(batch, device=GPU)
 
-		if isinstance(feats, tuple):
-			feats = feats[0]
+			ims = chainer.Variable(X)
+			feats = model(ims, layer_name=model.meta.feature_layer)
 
-		f = scaler.transform(to_cpu(feats.array))
-		gt = to_cpu(y)
+			if isinstance(feats, tuple):
+				feats = feats[0]
 
-		topk_preds, topk_accu = _topk_decision(f, gt)
+			_feats = scaler.transform(to_cpu(feats.array))
 
-		logging.debug("Batch Accuracy: {:.4%} (Top1) | {:.4%} (Top{}) {: 3d} / {: 3d}".format(
+			topk_preds = evaluate_batch(_feats, to_cpu(y), clf=clf, topk=args.topk)
 
-			np.mean(topk_preds[:, -1] == gt),
-			topk_accu,
+			kwargs = dict(
+				model=model, coefs=clf.coef_,
+				ims=ims, labs=y,
+				feats=feats, topk_preds=topk_preds,
 
-			args.topk,
-			np.sum(topk_preds[:, -1] == gt),
-			len(batch)
-		))
+				peak_size=None, #int(h * 0.35 / 2),
+				swap_channels=args.swap_channels,
 
-		kwargs = dict(
-			model=model, coefs=clf.coef_,
-			ims=ims, labs=y,
-			feats=feats, topk_preds=topk_preds,
+				gamma=args.gamma,
+				sigma=args.sigma,
+				K=args.K,
+				alpha=1,
+				thresh_type=args.thresh_type,
+				cluster_init=ClusterInitType.MAXIMAS,
 
-			peak_size=None, #int(h * 0.35 / 2),
-			swap_channels=args.swap_channels,
+				feature_composition=feature_composition
+			)
 
-			gamma=args.gamma,
-			sigma=args.sigma,
-			K=args.K,
-			alpha=1,
-			thresh_type=args.thresh_type,
-			cluster_init=ClusterInitType.MAXIMAS,
+			if args.extract:
+				extract_iter = extract_parts(**kwargs)
+				for i, parts in enumerate(extract_iter):
+					im_idx = i + batch_i * it.batch_size
+					im_uuid = data.uuids[im_idx]
+					for pred_part, full_part in zip(*parts):
+						parts_to_file(im_uuid, *pred_part, out=pred_out)
+						parts_to_file(im_uuid, *full_part, out=full_out)
 
-			feature_composition=feature_composition
-		)
+			else:
+				show_feature_saliency(**kwargs)
+				break
 
-		if args.extract:
-			extract_iter = extract_parts(**kwargs)
-			for i, parts in enumerate(extract_iter):
-				im_idx = i + batch_i * it.batch_size
-				im_uuid = data.uuids[im_idx]
-				for pred_part, full_part in zip(*parts):
-					parts_to_file(im_uuid, *pred_part, out=pred_out)
-					parts_to_file(im_uuid, *full_part, out=full_out)
 
-		else:
-			show_feature_saliency(**kwargs)
-			break
 
-	if None not in [pred_out, full_out]:
-		pred_out.close()
-		full_out.close()
 
 chainer.global_config.cv_resize_backend = "PIL"
 with chainer.using_config("train", False):
