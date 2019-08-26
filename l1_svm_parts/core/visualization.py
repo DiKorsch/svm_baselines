@@ -10,6 +10,7 @@ from matplotlib.gridspec import GridSpec
 from functools import partial
 
 from l1_svm_parts.core.parts_and_bboxes import optimal_boxes, simple_boxes
+from l1_svm_parts.core.propagator import Propagator
 from l1_svm_parts.utils import ThresholdType
 from l1_svm_parts.utils import ClusterInitType
 from l1_svm_parts.utils import prop_back
@@ -53,6 +54,8 @@ def plot_gradient(im, grad, xp=np, ax=None, spec=None, title="",
 	swap_channels=True,
 	alpha=0.5, gamma=1.0, sigma=1,
 	peak_size=None, K=None, **kwargs):
+
+
 	grad = grad_correction(grad, xp, sigma, gamma, swap_channels)
 
 	if ax is None:
@@ -73,9 +76,8 @@ def plot_gradient(im, grad, xp=np, ax=None, spec=None, title="",
 		cmap = plt.cm.viridis_r
 
 		cluster_init = ClusterInitType.get(kwargs["cluster_init"])
-		init_coords = cluster_init(grad, K)
-
-		ax.scatter(*init_coords[::-1], marker="x", color="K")
+		ys, xs = init_coords = cluster_init(grad, K)
+		ax.scatter(xs, ys, marker="x", color="K")
 
 		boxes, centers, labs = optimal_boxes(im, grad,
 			K=K, **kwargs)
@@ -115,31 +117,14 @@ def show_feature_saliency(model, coefs, ims, labs, feats, topk_preds,
 	plot_sel_feats_grad=False,
 	**kwargs):
 
-	preds = topk_preds[:, -1]
-
-	gt_coefs = coefs[to_cpu(labs)]
-	gt_im_grad = prop_back(model, feats, ims, gt_coefs != 0)
-
-	topk_pred_coefs = [coefs[to_cpu(p)] for p in topk_preds.T]
-	topk_pred_im_grad = [prop_back(model, feats, ims, p != 0) for p in topk_pred_coefs]
-
-	pred_coefs = topk_pred_coefs[-1]
-	pred_im_grad = topk_pred_im_grad[-1]
-
-	full_im_grad = prop_back(model, feats, ims)
-
-
-	# for g in [full_im_grad, pred_im_grad]:
-	# 	logging.debug(g.min(), g.max())
+	propagator = Propagator(model, feats, ims, labs, coefs, topk_preds)
 
 	_plot_gradient = partial(plot_gradient,
 		xp=model.xp, swap_channels=swap_channels, **kwargs)
 
-	for i, (gt_coef, pred_coef) in enumerate(zip(gt_coefs, pred_coefs)):
-
-		logging.debug(
-			"predicted class: {}, GT class: {}".format(
-			preds[i], labs[i]))
+	for i, (full_grad, pred_grad) in propagator:
+		pred, gt = topk_preds[i, -1], labs[i]
+		logging.debug("predicted class: {}, GT class: {}".format(pred, gt))
 
 		spec = GridSpec(2, 6)
 		fig = plt.figure(figsize=(16, 9))
@@ -147,20 +132,12 @@ def show_feature_saliency(model, coefs, ims, labs, feats, topk_preds,
 		ax0 = plt.subplot(spec[:, 0:2])
 		ax1 = plt.subplot(spec[:, 2:4])
 
-
-		# fig, _axs = plt.subplots(1, 2, figsize=(16, 9))
-		# axs = lambda i: _axs[np.unravel_index(i, _axs.shape)]
-		# [axs(_i).axis("off") for _i in range(_axs.size)]
-
 		im = prepare_back(ims[i], swap_channels=swap_channels)
-		title ="Original Image [predicted: {}, GT: {}]".format(preds[i], labs[i])
+		title ="Original Image [predicted: {}, GT: {}]".format(pred, gt)
+
 		imshow(im, ax=ax0, title=title)
 
-		_plot_gradient(im, pred_im_grad[i],
-					   ax=ax1,
-					   title="Fitted Boxes",
-					   spec=spec,
-					  )
+		_plot_gradient(im, pred_grad, ax=ax1, title="Fitted Boxes", spec=spec)
 
 		plt.tight_layout()
 		plt.show()

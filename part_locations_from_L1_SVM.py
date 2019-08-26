@@ -35,70 +35,8 @@ def topk_decision(X, y, clf, k):
 	topk_accu = (topk_preds == np.expand_dims(y, 1)).max(axis=1).mean()
 	return topk_preds, topk_accu
 
-def main(args):
-	annot_cls = AnnotationType.get(args.dataset).value
-	parts_key = "{}_{}".format(args.dataset, "GLOBAL")
+def new_model(args, model_info, n_classes):
 
-	logging.info("Loading {} annotations from \"{}\"".format(
-		annot_cls, args.data))
-	logging.info("Using \"{}\"-parts".format(parts_key))
-
-	annot = annot_cls(args.data,
-		parts=parts_key,
-		feature_model=args.model_type
-	)
-
-	data_info = annot.info
-	model_info = data_info.MODELS[args.model_type]
-	part_info = data_info.PARTS[parts_key]
-
-	data = annot.new_dataset(subset=None)
-	train_data, val_data = map(annot.new_dataset, ["train", "test"])
-
-	n_classes = part_info.n_classes + args.label_shift
-
-	if annot.labels.max() > n_classes:
-		_, annot.labels = np.unique(annot.labels, return_inverse=True)
-
-	assert train_data.features is not None and val_data.features is not None, \
-		"Features are not loaded!"
-
-	assert val_data.features.ndim == 2 or val_data.features.shape[1] == 1, \
-		"Only GLOBAL part features are supported here!"
-
-	if args.scale_features:
-		logging.info("Scaling data on training set!")
-		scaler = MinMaxScaler()
-		scaler.fit(train_data.features[:, -1])
-	else:
-		scaler = IdentityScaler()
-
-	trained_svm = "".format(
-		args.dataset, args.model_type)
-
-	if args.trained_svm:
-		trained_svm = args.trained_svm
-
-	logging.info("Loading SVM from \"{}\"".format(trained_svm))
-	clf = joblib.load(trained_svm)
-
-	COEFS = clf.coef_
-
-	if args.visualize_coefs:
-		logging.info("Visualizing coefficients...")
-		visualize_coefs(clf.coef_, figsize=(16, 9*3))
-
-	_topk_decision = partial(topk_decision, clf=clf, k=args.topk)
-	for _data, subset in [(train_data, "training"), (val_data, "validation")]:
-		X = scaler.transform(_data.features[:, -1])
-		y = _data.labels
-		pred = clf.decision_function(X).argmax(axis=1)
-		logging.info("Accuracy on {} subset: {:.4%}".format(subset, (pred == y).mean()))
-
-		topk_preds, topk_accu = _topk_decision(X, y)
-		logging.info("Top{}-Accuracy on {} subset: {:.4%}".format(args.topk, subset, topk_accu))
-
-	model_cls = ModelType
 	logging.info("Creating and loading model ...")
 
 	model = ModelType.new(
@@ -150,11 +88,72 @@ def main(args):
 		model_info.class_key, weights))
 	model.load_for_inference(n_classes=n_classes, weights=weights)
 
+	return model, prepare
+
+
+
+def main(args):
+	annot_cls = AnnotationType.get(args.dataset).value
+	parts_key = "{}_{}".format(args.dataset, "GLOBAL")
+
+	logging.info("Loading {} annotations from \"{}\"".format(
+		annot_cls, args.data))
+	logging.info("Using \"{}\"-parts".format(parts_key))
+
+	annot = annot_cls(args.data,
+		parts=parts_key,
+		feature_model=args.model_type
+	)
+
+	data_info = annot.info
+	model_info = data_info.MODELS[args.model_type]
+	part_info = data_info.PARTS[parts_key]
+
+	data = annot.new_dataset(subset=None)
+	train_data, val_data = map(annot.new_dataset, ["train", "test"])
+
+	n_classes = part_info.n_classes + args.label_shift
+
+	if annot.labels.max() > n_classes:
+		_, annot.labels = np.unique(annot.labels, return_inverse=True)
+
+	assert train_data.features is not None and val_data.features is not None, \
+		"Features are not loaded!"
+
+	assert val_data.features.ndim == 2 or val_data.features.shape[1] == 1, \
+		"Only GLOBAL part features are supported here!"
+
+	if args.scale_features:
+		logging.info("Scaling data on training set!")
+		scaler = MinMaxScaler()
+		scaler.fit(train_data.features[:, -1])
+	else:
+		scaler = IdentityScaler()
+
+	trained_svm = args.trained_svm
+	logging.info("Loading SVM from \"{}\"".format(trained_svm))
+	clf = joblib.load(trained_svm)
+
+	if args.visualize_coefs:
+		logging.info("Visualizing coefficients...")
+		visualize_coefs(clf.coef_, figsize=(16, 9*3))
+
+	_topk_decision = partial(topk_decision, clf=clf, k=args.topk)
+	for _data, subset in [(train_data, "training"), (val_data, "validation")]:
+		X = scaler.transform(_data.features[:, -1])
+		y = _data.labels
+		pred = clf.decision_function(X).argmax(axis=1)
+		logging.info("Accuracy on {} subset: {:.4%}".format(subset, (pred == y).mean()))
+
+		topk_preds, topk_accu = _topk_decision(X, y)
+		logging.info("Top{}-Accuracy on {} subset: {:.4%}".format(args.topk, subset, topk_accu))
+
+	model, prepare = new_model(args, model_info, n_classes)
+
 	GPU = args.gpu[0]
 	if GPU >= 0:
 		chainer.cuda.get_device(GPU).use()
 		model.to_gpu(GPU)
-
 
 	it, n_batches = new_iterator(data,
 		args.n_jobs, args.batch_size,
@@ -176,9 +175,10 @@ def main(args):
 
 	feature_composition = [
 		"coords",
-		"grad",
-		"RGB"
+		# "grad",
+		# "RGB"
 	]
+
 	logging.info("Using following feature composition: {}".format(feature_composition))
 
 	for batch_i, batch in tqdm(enumerate(it), total=n_batches):
@@ -187,8 +187,8 @@ def main(args):
 		X, y = concat_examples(batch, device=GPU)
 
 		ims = chainer.Variable(X)
-
 		feats = model(ims, layer_name=model.meta.feature_layer)
+
 		if isinstance(feats, tuple):
 			feats = feats[0]
 
@@ -208,7 +208,7 @@ def main(args):
 		))
 
 		kwargs = dict(
-			model=model, coefs=COEFS,
+			model=model, coefs=clf.coef_,
 			ims=ims, labs=y,
 			feats=feats, topk_preds=topk_preds,
 
@@ -224,8 +224,6 @@ def main(args):
 
 			feature_composition=feature_composition
 		)
-
-
 
 		if args.extract:
 			extract_iter = extract_parts(**kwargs)

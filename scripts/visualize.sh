@@ -22,3 +22,4 @@ export OPTS="${OPTS} --prepare_type model"
 	--weights ${WEIGHTS} \
 	--K $N_PARTS \
 	--thresh_type otsu \
+	$@
