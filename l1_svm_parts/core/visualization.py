@@ -5,6 +5,7 @@ from chainer.cuda import to_cpu
 
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
+from matplotlib.gridspec import GridSpec
 
 from functools import partial
 
@@ -14,11 +15,15 @@ from l1_svm_parts.utils import ClusterInitType
 from l1_svm_parts.utils import prop_back
 from l1_svm_parts.utils.image import prepare_back, grad_correction
 
-def imshow(im, ax=None, figsize=(32, 18), **kwargs):
+def imshow(im, ax=None, title=None, figsize=(32, 18), **kwargs):
 	if ax is None:
 		fig, ax = plt.subplots(figsize=figsize)
 	ax.imshow(im, **kwargs)
 	ax.axis("off")
+
+	if title is not None:
+		ax.set_title(title)
+
 	return ax
 
 
@@ -44,7 +49,7 @@ def visualize_coefs(coefs, **kwargs):
 	plt.close()
 
 
-def plot_gradient(im, grad, xp=np, ax=None, title="",
+def plot_gradient(im, grad, xp=np, ax=None, spec=None, title="",
 	swap_channels=True,
 	alpha=0.5, gamma=1.0, sigma=1,
 	peak_size=None, K=None, **kwargs):
@@ -53,8 +58,7 @@ def plot_gradient(im, grad, xp=np, ax=None, title="",
 	if ax is None:
 		_, ax = plt.subplots(figsize=(16, 9))
 
-	#ax = imshow(im, ax=ax)
-	ax = imshow(np.zeros_like(im), ax=ax)
+	ax = imshow(np.zeros_like(im), ax=ax, title=title)
 
 	thresh_type = ThresholdType.get(kwargs["thresh_type"])
 	thresh_mask = thresh_type(im, grad)
@@ -62,13 +66,8 @@ def plot_gradient(im, grad, xp=np, ax=None, title="",
 	new_grad[thresh_mask] = grad[thresh_mask]
 
 	# new_grad = grad.copy()
-	ax = imshow(new_grad, ax=ax,
-				cmap=plt.cm.gray,
-				alpha=alpha)
-
-	# ax = imshow(thresh_mask, ax=ax,
-	# 			cmap=plt.cm.Reds,
-	# 			alpha=0.4)
+	ax = imshow(new_grad, ax=ax, cmap=plt.cm.gray, alpha=alpha)
+	# ax = imshow(thresh_mask, ax=ax, cmap=plt.cm.Reds, alpha=0.4)
 
 	if K is not None and K > 0:
 		cmap = plt.cm.viridis_r
@@ -87,57 +86,14 @@ def plot_gradient(im, grad, xp=np, ax=None, title="",
 				linewidth=3,
 				color=cmap(c / len(boxes))))
 
-		# sim_boxes, centers, labs = simple_boxes(im, grad,
-		# 	K=K, **kwargs)
-
-		# for c, box in sim_boxes:
-		# 	ax.add_patch(Rectangle(
-		# 		*box, fill=False,
-		# 		color=cmap(c / len(sim_boxes)),
-		# 		linewidth=3,
-		# 		linestyle="--",
-		# 		alpha=1
-		# 	))
-
-		# ys, xs = centers[:, :2].T
-		# ax.scatter(xs, ys, marker="D", c=range(K), cmap=cmap)
-		ax.imshow(labs, cmap=cmap, alpha=0.3)
-
-
-		# _idx = 0
-		# _fig, _ax = plt.subplots()
-		# _labs = labs.copy()
-		# _labs[labs != _idx] = np.nan
-
-		# _sim_c, _sim_box = sim_boxes[_idx]
-		# _c, _box = boxes[_idx]
-
-		# _ax = imshow(np.zeros_like(_labs), ax=_ax, cmap=plt.cm.gray)
-		# _ax.imshow(_labs, vmin=labs.min(), vmax=labs.max(),
-		# 	cmap=cmap, alpha=0.3)
-		# _ax.add_patch(Rectangle(
-		# 	*_sim_box, fill=False,
-		# 	color=cmap(_sim_c / len(sim_boxes)),
-		# 	linewidth=3,
-		# 	linestyle="--",
-		# 	alpha=0.5
-		# ))
-		# _ax.add_patch(Rectangle(
-		# 	*_box, fill=False,
-		# 	linewidth=3,
-		# 	color=cmap(_c / len(sim_boxes)),
-		# ))
-
-
-		_fig, _axs = plt.subplots(2, 2)
+		imshow(labs, ax, cmap=cmap, alpha=0.3)
 
 		for i in range(K):
-			_ax = _axs[np.unravel_index(i, _axs.shape)]
+			row, col = np.unravel_index(i, (2, 2))
+			_ax = plt.subplot(spec[row, col + 4])
 			_c, ((x, y), w, h) = boxes[i]
 			x,y,w,h = map(int, [x,y,w,h])
-			_ax.axis("off")
-			_ax.imshow(im[y:y+h, x:x+w])
-			_ax.set_title("Part #{}".format(i+1))
+			imshow(im[y:y+h, x:x+w], _ax, title="Part #{}".format(i+1))
 
 	if peak_size is not None:
 		peaks = peak_local_max(
@@ -148,8 +104,6 @@ def plot_gradient(im, grad, xp=np, ax=None, title="",
 		ys, xs = peaks.T
 		ax.scatter(xs, ys, marker="x", c="blue")
 
-
-	ax.set_title(title)
 
 	return ax
 
@@ -182,36 +136,33 @@ def show_feature_saliency(model, coefs, ims, labs, feats, topk_preds,
 		xp=model.xp, swap_channels=swap_channels, **kwargs)
 
 	for i, (gt_coef, pred_coef) in enumerate(zip(gt_coefs, pred_coefs)):
-		# if i != 2:
-		# 	continue
+
 		logging.debug(
 			"predicted class: {}, GT class: {}".format(
 			preds[i], labs[i]))
-		fig, _axs = plt.subplots(1, 2, figsize=(16, 9))
 
-		axs = lambda i: _axs[np.unravel_index(i, _axs.shape)]
-		[axs(_i).axis("off") for _i in range(_axs.size)]
+		spec = GridSpec(2, 6)
+		fig = plt.figure(figsize=(16, 9))
+
+		ax0 = plt.subplot(spec[:, 0:2])
+		ax1 = plt.subplot(spec[:, 2:4])
+
+
+		# fig, _axs = plt.subplots(1, 2, figsize=(16, 9))
+		# axs = lambda i: _axs[np.unravel_index(i, _axs.shape)]
+		# [axs(_i).axis("off") for _i in range(_axs.size)]
 
 		im = prepare_back(ims[i], swap_channels=swap_channels)
-		ax = imshow(im, ax=axs(0))
-		ax.set_title("Original Image [predicted: {}, GT: {}]".format(
-			preds[i], labs[i]))
-
-		# _plot_gradient(im, gt_im_grad[i],
-		# 			   ax=axs(1),
-		# 			   title="GT Gradient",
-		# 			  )
+		title ="Original Image [predicted: {}, GT: {}]".format(preds[i], labs[i])
+		imshow(im, ax=ax0, title=title)
 
 		_plot_gradient(im, pred_im_grad[i],
-					   ax=axs(1),
+					   ax=ax1,
 					   title="Fitted Boxes",
+					   spec=spec,
 					  )
 
-		# _plot_gradient(im, full_im_grad[i],
-		# 			   ax=axs(3),
-		# 			   title="Full Gradient",
-		# 			  )
-
+		plt.tight_layout()
 		plt.show()
 		plt.close()
 

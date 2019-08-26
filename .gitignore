@@ -108,3 +108,4 @@ datasets*
 .results*
 .out
 .grid_search
+.directory
