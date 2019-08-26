@@ -27,8 +27,11 @@ from chainer.cuda import to_cpu
 from chainer.dataset.convert import concat_examples
 
 from l1_svm_parts.utils import arguments, IdentityScaler, ClusterInitType
+from l1_svm_parts.utils.image import prepare_back
 from l1_svm_parts.core.visualization import show_feature_saliency, visualize_coefs
-from l1_svm_parts.core.extraction import extract_parts, parts_to_file
+from l1_svm_parts.core.extraction import parts_to_file, extract_parts
+from l1_svm_parts.core.parts_and_bboxes import get_parts
+from l1_svm_parts.core.propagator import Propagator
 
 @contextmanager
 def outputs(args):
@@ -191,7 +194,7 @@ def init_data(args, clf=None):
 		for _data, subset in [(train_data, "training"), (val_data, "validation")]:
 			evaluate_data(clf, _data, subset, args.topk, scaler)
 
-	return scaler, it, model_info, n_classes
+	return scaler, data, it, model_info, n_classes
 
 
 feature_composition = [
@@ -205,7 +208,7 @@ def main(args):
 
 	clf = load_svm(args)
 
-	scaler, it, *model_args = init_data(args, clf)
+	scaler, data, it, *model_args = init_data(args, clf)
 
 	model, prepare = new_model(args, *model_args)
 
@@ -234,10 +237,8 @@ def main(args):
 			topk_preds = evaluate_batch(_feats, to_cpu(y), clf=clf, topk=args.topk)
 
 			kwargs = dict(
-				model=model, coefs=clf.coef_,
-				ims=ims, labs=y,
-				feats=feats, topk_preds=topk_preds,
 
+				xp=model.xp,
 				peak_size=None, #int(h * 0.35 / 2),
 				swap_channels=args.swap_channels,
 
@@ -251,17 +252,21 @@ def main(args):
 				feature_composition=feature_composition
 			)
 
+			propagator = Propagator(model, feats, ims, y, clf.coef_, topk_preds)
+
 			if args.extract:
-				extract_iter = extract_parts(**kwargs)
-				for i, parts in enumerate(extract_iter):
-					im_idx = i + batch_i * it.batch_size
+
+				for i, parts in extract_parts(propagator, **kwargs):
+
+					im_idx = i + batch_i * args.batch_size
 					im_uuid = data.uuids[im_idx]
+
 					for pred_part, full_part in zip(*parts):
 						parts_to_file(im_uuid, *pred_part, out=pred_out)
 						parts_to_file(im_uuid, *full_part, out=full_out)
 
 			else:
-				show_feature_saliency(**kwargs)
+				show_feature_saliency(propagator, **kwargs)
 				break
 
 

@@ -110,20 +110,18 @@ def plot_gradient(im, grad, xp=np, ax=None, spec=None, title="",
 	return ax
 
 
-def show_feature_saliency(model, coefs, ims, labs, feats, topk_preds,
+def show_feature_saliency(propagator,
 	swap_channels=True,
 	normalize_grads=False,
 	plot_topk_grads=False,
 	plot_sel_feats_grad=False,
 	**kwargs):
 
-	propagator = Propagator(model, feats, ims, labs, coefs, topk_preds)
-
 	_plot_gradient = partial(plot_gradient,
-		xp=model.xp, swap_channels=swap_channels, **kwargs)
+		swap_channels=swap_channels, **kwargs)
 
 	for i, (full_grad, pred_grad) in propagator:
-		pred, gt = topk_preds[i, -1], labs[i]
+		pred, gt = propagator.topk_preds[i, -1], propagator.labs[i]
 		logging.debug("predicted class: {}, GT class: {}".format(pred, gt))
 
 		spec = GridSpec(2, 6)
@@ -132,7 +130,7 @@ def show_feature_saliency(model, coefs, ims, labs, feats, topk_preds,
 		ax0 = plt.subplot(spec[:, 0:2])
 		ax1 = plt.subplot(spec[:, 2:4])
 
-		im = prepare_back(ims[i], swap_channels=swap_channels)
+		im = prepare_back(propagator.ims[i], swap_channels=swap_channels)
 		title ="Original Image [predicted: {}, GT: {}]".format(pred, gt)
 
 		imshow(im, ax=ax0, title=title)

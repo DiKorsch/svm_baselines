@@ -23,7 +23,9 @@ class Propagator(object):
 	def __init__(self, model, feats, ims, labs, coefs, topk_preds):
 		super(Propagator, self).__init__()
 
-		# preds = topk_preds[:, -1]
+		self.topk_preds = topk_preds
+		self.ims = ims
+		self.labs = labs
 
 		self.gt_coefs = coefs[to_cpu(labs)]
 		self.topk_pred_coefs = [coefs[to_cpu(p)] for p in topk_preds.T]
