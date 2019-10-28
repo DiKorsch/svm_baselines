@@ -1,4 +1,3 @@
-raise ImportError("DO NOT IMPORT ME!")
 import numpy as np
 
 from chainer.cuda import to_cpu
@@ -20,16 +19,16 @@ def prepare_back(im, swap_channels=True):
 		im = im[::-1]
 	return im.transpose(1, 2, 0)
 
-def grad_to_im(grad, xp=np, keepdims=True):
-	return xp.abs(grad).mean(axis=0, keepdims=keepdims)
+def saliency_to_im(saliency, xp=np, keepdims=True):
+	return xp.abs(saliency).mean(axis=0, keepdims=keepdims)
 
-def grad_correction(grad, xp=np, sigma=None, gamma=1., swap_channels=True):
+def correction(saliency, xp=np, sigma=None, gamma=1., swap_channels=True):
 
-	grad = prepare_back(grad_to_im(grad, xp=xp), swap_channels)
+	saliency = prepare_back(saliency_to_im(saliency), swap_channels)
 
 	if sigma is None:
-		grad = grad.squeeze()
+		saliency = saliency.squeeze()
 	else:
-		grad = gaussian_filter(grad, sigma=sigma).squeeze()
+		saliency = gaussian_filter(saliency, sigma=sigma).squeeze()
 
-	return grad**gamma
+	return saliency**gamma

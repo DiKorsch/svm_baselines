@@ -9,12 +9,14 @@ from matplotlib.gridspec import GridSpec
 
 from functools import partial
 
-from l1_svm_parts.core.parts_and_bboxes import optimal_boxes, simple_boxes
+# from l1_svm_parts.core.parts_and_bboxes import boxes_func
 from l1_svm_parts.core.propagator import Propagator
-from l1_svm_parts.utils import ThresholdType
-from l1_svm_parts.utils import ClusterInitType
 from l1_svm_parts.utils import prop_back
-from l1_svm_parts.utils.image import prepare_back, grad_correction
+
+from cluster_parts import BoundingBoxParts
+from cluster_parts.utils import ThresholdType
+from cluster_parts.utils import ClusterInitType
+from cluster_parts.utils import image
 
 def imshow(im, ax=None, title=None, figsize=(32, 18), **kwargs):
 	if ax is None:
@@ -50,18 +52,25 @@ def visualize_coefs(coefs, **kwargs):
 	plt.close()
 
 
-def plot_gradient(im, grad, xp=np, ax=None, spec=None, title="",
+def plot_gradient(im, grad, xp=np, spec=None, title="",
 	swap_channels=True,
 	alpha=0.5, gamma=1.0, sigma=1,
 	peak_size=None, K=None, **kwargs):
 
+	ax1 = plt.subplot(spec[2:4, 0:2])
+	ax2 = plt.subplot(spec[0:2, 2:4])
 
-	grad = grad_correction(grad, xp, sigma, gamma, swap_channels)
+	im_boxes = BoundingBoxParts(im,
+		K=K, xp=xp,
+		swap_channels=swap_channels,
+		gamma=gamma,
+		sigma=sigma,
+		**kwargs,
+	)
 
-	if ax is None:
-		_, ax = plt.subplots(figsize=(16, 9))
-
-	ax = imshow(np.zeros_like(im), ax=ax, title=title)
+	grad = image.correction(grad, xp, sigma, gamma, swap_channels)
+	ax2 = imshow(im, ax=ax2, title="Gradient")
+	ax2 = imshow(grad, ax=ax2, alpha=0.7)
 
 	thresh_type = ThresholdType.get(kwargs["thresh_type"])
 	thresh_mask = thresh_type(im, grad)
@@ -69,7 +78,7 @@ def plot_gradient(im, grad, xp=np, ax=None, spec=None, title="",
 	new_grad[thresh_mask] = grad[thresh_mask]
 
 	# new_grad = grad.copy()
-	ax = imshow(new_grad, ax=ax, cmap=plt.cm.gray, alpha=alpha)
+	ax1 = imshow(new_grad, ax=ax1, cmap=plt.cm.gray, alpha=alpha)
 	# ax = imshow(thresh_mask, ax=ax, cmap=plt.cm.Reds, alpha=0.4)
 
 	if K is not None and K > 0:
@@ -77,22 +86,22 @@ def plot_gradient(im, grad, xp=np, ax=None, spec=None, title="",
 
 		cluster_init = ClusterInitType.get(kwargs["cluster_init"])
 		ys, xs = init_coords = cluster_init(grad, K)
-		ax.scatter(xs, ys, marker="x", color="K")
+		ax1.scatter(xs, ys, marker="x", color="black")
 
-		boxes, centers, labs = optimal_boxes(im, grad,
-			K=K, **kwargs)
+		centers, labs = im_boxes.cluster_saliency(grad)
+		boxes = im_boxes.get_boxes(centers, labs, grad)
 
 		for c, box in boxes:
-			ax.add_patch(Rectangle(
+			ax1.add_patch(Rectangle(
 				*box, fill=False,
 				linewidth=3,
 				color=cmap(c / len(boxes))))
 
-		imshow(labs, ax, cmap=cmap, alpha=0.3)
+		imshow(labs, ax1, cmap=cmap, alpha=0.3)
 
 		for i in range(K):
 			row, col = np.unravel_index(i, (2, 2))
-			_ax = plt.subplot(spec[row, col + 4])
+			_ax = plt.subplot(spec[row + 2, col + 2])
 			_c, ((x, y), w, h) = boxes[i]
 			x,y,w,h = map(int, [x,y,w,h])
 			imshow(im[y:y+h, x:x+w], _ax, title="Part #{}".format(i+1))
@@ -107,7 +116,7 @@ def plot_gradient(im, grad, xp=np, ax=None, spec=None, title="",
 		ax.scatter(xs, ys, marker="x", c="blue")
 
 
-	return ax
+	return ax1
 
 
 def show_feature_saliency(propagator,
@@ -124,18 +133,16 @@ def show_feature_saliency(propagator,
 		pred, gt = propagator.topk_preds[i, -1], propagator.labs[i]
 		logging.debug("predicted class: {}, GT class: {}".format(pred, gt))
 
-		spec = GridSpec(2, 6)
+		spec = GridSpec(4, 4)
 		fig = plt.figure(figsize=(16, 9))
 
-		ax0 = plt.subplot(spec[:, 0:2])
-		ax1 = plt.subplot(spec[:, 2:4])
+		ax0 = plt.subplot(spec[0:2, 0:2])
 
-		im = prepare_back(propagator.ims[i], swap_channels=swap_channels)
+		im = image.prepare_back(propagator.ims[i], swap_channels=swap_channels)
 		title ="Original Image [predicted: {}, GT: {}]".format(pred, gt)
 
 		imshow(im, ax=ax0, title=title)
-
-		_plot_gradient(im, pred_grad, ax=ax1, title="Fitted Boxes", spec=spec)
+		_plot_gradient(im, pred_grad, spec=spec, title="Fitted Boxes")
 
 		plt.tight_layout()
 		plt.show()

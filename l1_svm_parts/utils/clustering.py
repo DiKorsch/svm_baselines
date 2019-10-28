@@ -1,3 +1,4 @@
+raise ImportError("DO NOT IMPORT ME!")
 import numpy as np
 from sklearn.cluster import KMeans
 

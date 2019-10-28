@@ -26,12 +26,12 @@ from chainer_addons.utils.imgproc import _center_crop
 from chainer.cuda import to_cpu
 from chainer.dataset.convert import concat_examples
 
-from l1_svm_parts.utils import arguments, IdentityScaler, ClusterInitType
-from l1_svm_parts.utils.image import prepare_back
+from l1_svm_parts.utils import arguments, IdentityScaler
 from l1_svm_parts.core.visualization import show_feature_saliency, visualize_coefs
 from l1_svm_parts.core.extraction import parts_to_file, extract_parts
-from l1_svm_parts.core.parts_and_bboxes import get_parts
 from l1_svm_parts.core.propagator import Propagator
+
+from cluster_parts.utils import ClusterInitType
 
 @contextmanager
 def outputs(args):
@@ -155,7 +155,7 @@ def init_data(args, clf=None):
 		annot_cls, args.data))
 	logging.info("Using \"{}\"-parts".format(parts_key))
 
-	annot = annot_cls(args.data, parts=parts_key, feature_model=args.model_type)
+	annot = annot_cls(root_or_infofile=args.data, parts=parts_key, feature_model=args.model_type)
 
 	data_info = annot.info
 	model_info = data_info.MODELS[args.model_type]
@@ -271,7 +271,7 @@ def main(args):
 
 
 
-
+np.seterr(all="raise")
 chainer.global_config.cv_resize_backend = "PIL"
 with chainer.using_config("train", False):
 	main(arguments.parse_args())

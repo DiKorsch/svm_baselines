@@ -1,3 +1,5 @@
+raise ImportError("DO NOT IMPORT ME!")
+
 import numpy as np
 import logging
 
@@ -76,9 +78,12 @@ def fit_bbox(mask, grad=None, optimize=False, min_bbox=64):
 	y0, x0, y1, x1 = bbox
 	h, w = y1 - y0, x1 - x0
 	search_area = mask[y0:y1, x0:x1].astype(np.float32)
+
+	# the search area is weighted with the gradient values
 	if grad is not None:
 		assert 0.0 <= grad.max() <= 1.0
 		search_area *= grad[y0:y1, x0:x1]
+
 	scaler = np.array([h, w, h, w])
 
 	# (1) Our search area is [(x0,y0), (x1,y1)].
@@ -99,6 +104,13 @@ def fit_bbox(mask, grad=None, optimize=False, min_bbox=64):
 		else:
 			ratio = (_w/_h) if _h != 0 else -100
 
+		# import matplotlib.pyplot as plt
+		# fig, axs = plt.subplots(1,2)
+		# axs[0].imshow(area, vmin=0, vmax=1)
+		# axs[1].imshow(mask, vmin=0, vmax=1)
+		# print(y0, ":", y1, ",", x0, ":", x1)
+		# plt.show(); plt.close()
+
 		TP = area.sum()
 		FP = (1-area).sum()
 		FN = mask.sum() - TP
@@ -109,11 +121,15 @@ def fit_bbox(mask, grad=None, optimize=False, min_bbox=64):
 
 	def Recall(b, mask):
 		TP, FP, FN, TN, ratio = _measures(b, mask)
+		if TP + FN == 0:
+			return 0
 		return -(TP / (TP + FN)) * ratio
 
 	def Precision(b, mask):
 		TP, FP, FN, TN, ratio = _measures(b, mask)
-		return -(TP / (TP + FP))
+		if TP + FP == 0:
+			return 0
+		return -(TP / (TP + FP)) * ratio
 
 	def Fscore(b, mask, beta=1):
 		TP, FP, FN, TN, ratio = _measures(b, mask)
@@ -126,7 +142,7 @@ def fit_bbox(mask, grad=None, optimize=False, min_bbox=64):
 	F1 = partial(Fscore, beta=1)
 	F0_5 = partial(Fscore, beta=0.5)
 
-	res = minimize(Recall, init_bbox,
+	res = minimize(Precision, init_bbox,
 				   args=(search_area,),
 				   options=dict(eps=1e-2, gtol=1e-1),
 				   bounds=Bounds(0, 1),
@@ -138,8 +154,7 @@ def fit_bbox(mask, grad=None, optimize=False, min_bbox=64):
 
 def get_boxes(centers, labels, K, fit_object=False, **kwargs):
 	values = labels[np.logical_not(np.isnan(labels))]
-	obj_mask = np.logical_not(np.isnan(labels))
-	obj_box = fit_bbox(obj_mask, **kwargs)
+	obj_box = None
 
 	res = []
 	for i in range(K):
@@ -147,6 +162,11 @@ def get_boxes(centers, labels, K, fit_object=False, **kwargs):
 		if mask.sum() == 0:
 			# if there is no cluster for this label,
 			# then take the extend of the whole object
+			if obj_box is None:
+				# lazy init this box to speed up the things a bit
+				obj_mask = np.logical_not(np.isnan(labels))
+				obj_box = fit_bbox(obj_mask, **kwargs)
+
 			y0, x0, y1, x1 = obj_box
 		else:
 			y0, x0, y1, x1 = fit_bbox(mask, **kwargs)
@@ -155,6 +175,10 @@ def get_boxes(centers, labels, K, fit_object=False, **kwargs):
 		res.append([i, ((x0, y0), w, h)])
 
 	if fit_object:
+		if obj_box is None:
+			obj_mask = np.logical_not(np.isnan(labels))
+			obj_box = fit_bbox(obj_mask, **kwargs)
+
 		y0, x0, y1, x1 = obj_box
 		h, w = y1 - y0, x1 - x0
 		res.append([i + 1, ((x0, y0), w, h)])
@@ -186,6 +210,8 @@ def optimal_boxes(im, grad, **kwargs):
 def simple_boxes(im, grad, **kwargs):
 	return _boxes(im, grad, optimal=False, **kwargs)
 
+boxes_func = simple_boxes
+
 def get_parts(im, grad, xp=np,
 	swap_channels=True,
 	alpha=0.5, gamma=1.0, sigma=1,
@@ -197,7 +223,7 @@ def get_parts(im, grad, xp=np,
 		middle = (h//2, w//2)
 		return [[i, (middle, h//2, w//2)] for i in range(kwargs["K"])]
 
-	grad = grad_correction(grad, xp, sigma, gamma, swap_channels)
-	boxes, centers, labs = optimal_boxes(im, grad, **kwargs)
+	grad = image.correction(grad, xp, sigma, gamma, swap_channels)
+	boxes, centers, labs = boxes_func(im, grad, **kwargs)
 
 	return boxes
