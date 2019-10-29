@@ -2,7 +2,6 @@
 if __name__ != '__main__': raise Exception("Do not import me!")
 
 import chainer
-import joblib
 import logging
 import numpy as np
 
@@ -17,7 +16,6 @@ from l1_svm_parts.core import Propagator
 from l1_svm_parts.core import extract_parts
 from l1_svm_parts.core import parts_to_file
 from l1_svm_parts.core import show_feature_saliency
-from l1_svm_parts.core import visualize_coefs
 from l1_svm_parts.utils import arguments
 from l1_svm_parts.utils import topk_decision
 
@@ -53,31 +51,12 @@ def evaluate_batch(feats, gt, clf, topk):
 
 	return topk_preds
 
-
-def load_svm(args):
-
-	logging.info("Loading SVM from \"{}\"".format(args.trained_svm))
-	clf = joblib.load(args.trained_svm)
-
-	if args.visualize_coefs:
-		logging.info("Visualizing coefficients...")
-		visualize_coefs(clf.coef_, figsize=(16, 9*3))
-
-	return clf
-
-
 def main(args):
-
-	clf = load_svm(args)
-
-	scaler, data, it, *model_args = Data.new(args, clf)
-
-	model, prepare = Model.new(args, *model_args)
-
 	GPU = args.gpu[0]
-	if GPU >= 0:
-		chainer.cuda.get_device(GPU).use()
-		model.to_gpu(GPU)
+
+	clf = Model.load_svm(args.trained_svm, args.visualize_coefs)
+	scaler, data, it, *model_args = Data.new(args, clf)
+	model, prepare = Model.new(args, *model_args)
 
 	logging.info("Using following feature composition: {}".format(args.feature_composition))
 
@@ -126,7 +105,6 @@ def main(args):
 			else:
 				show_feature_saliency(propagator, **kwargs)
 				break
-
 
 
 np.seterr(all="raise")

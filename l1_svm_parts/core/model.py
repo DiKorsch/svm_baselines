@@ -1,4 +1,6 @@
 import abc
+import chainer
+import joblib
 import logging
 
 from os.path import join
@@ -8,6 +10,7 @@ from chainer_addons.models import ModelType
 from chainer_addons.models import PrepareType
 from chainer_addons.utils.imgproc import _center_crop
 
+from l1_svm_parts.core.visualization import visualize_coefs
 
 class Model(abc.ABC):
 
@@ -15,8 +18,8 @@ class Model(abc.ABC):
 	def __init__(self):
 		super(Model, self).__init__()
 
-	@classmethod
-	def new(self, opts, model_info, n_classes):
+	@staticmethod
+	def new(opts, model_info, n_classes):
 		logging.info("Creating and loading model ...")
 
 		model = ModelType.new(
@@ -68,4 +71,20 @@ class Model(abc.ABC):
 			model_info.class_key, weights))
 		model.load_for_inference(n_classes=n_classes, weights=weights)
 
+		GPU = opts.gpu[0]
+		if GPU >= 0:
+			chainer.cuda.get_device(GPU).use()
+			model.to_gpu(GPU)
 		return model, prepare
+
+	@staticmethod
+	def load_svm(svm_path, visualize_coefs=False):
+
+		logging.info("Loading SVM from \"{}\"".format(svm_path))
+		clf = joblib.load(svm_path)
+
+		if visualize_coefs:
+			logging.info("Visualizing coefficients...")
+			visualize_coefs(clf.coef_, figsize=(16, 9*3))
+
+		return clf
