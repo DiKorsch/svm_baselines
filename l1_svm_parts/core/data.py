@@ -3,7 +3,6 @@ import logging
 import numpy as np
 
 from sklearn.preprocessing import MinMaxScaler
-from tqdm import tqdm
 
 from cvdatasets.annotations import AnnotationType
 from cvdatasets.utils import new_iterator
@@ -75,12 +74,11 @@ class Data(abc.ABC):
 			opts.n_jobs, opts.batch_size,
 			repeat=False, shuffle=False
 		)
-		it = tqdm(enumerate(it), total=n_batches)
 
 		if clf is not None:
 			for _data, subset in [(train_data, "training"), (val_data, "validation")]:
 				evaluate_data(clf, _data, subset, opts.topk, scaler)
 
-		return scaler, data, it, model_info, n_classes
+		return scaler, it, n_batches, model_info, n_classes
 
 

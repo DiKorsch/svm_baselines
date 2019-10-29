@@ -1,20 +1,21 @@
-import numpy as np
 import logging
+import numpy as np
 
 from chainer.cuda import to_cpu
 
 from matplotlib import pyplot as plt
-from matplotlib.patches import Rectangle
 from matplotlib.gridspec import GridSpec
+from matplotlib.patches import Rectangle
 
 from functools import partial
 
 from l1_svm_parts.core.propagator import Propagator
-from l1_svm_parts.utils import prop_back, prepare_back, saliency_to_im
+from l1_svm_parts.utils import prepare_back
+from l1_svm_parts.utils import saliency_to_im
 
 from cluster_parts.core import BoundingBoxPartExtractor
-from cluster_parts.utils import ThresholdType
 from cluster_parts.utils import ClusterInitType
+from cluster_parts.utils import ThresholdType
 
 def imshow(im, ax=None, title=None, figsize=(32, 18), **kwargs):
 	if ax is None:

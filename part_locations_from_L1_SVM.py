@@ -6,6 +6,7 @@ import logging
 import numpy as np
 
 from contextlib import contextmanager
+from tqdm import tqdm
 
 from chainer.cuda import to_cpu
 from chainer.dataset.convert import concat_examples
@@ -14,10 +15,8 @@ from l1_svm_parts.core import Data
 from l1_svm_parts.core import Model
 from l1_svm_parts.core import Propagator
 from l1_svm_parts.core import extract_parts
-from l1_svm_parts.core import parts_to_file
 from l1_svm_parts.core import show_feature_saliency
 from l1_svm_parts.utils import arguments
-from l1_svm_parts.utils import topk_decision
 
 from cluster_parts.core import BoundingBoxPartExtractor
 from cluster_parts.core import Corrector
@@ -35,27 +34,12 @@ def outputs(args):
 		logging.warning("Extraction is disabled!")
 		yield None, None
 
-def evaluate_batch(feats, gt, clf, topk):
-
-	topk_preds, topk_accu = topk_decision(feats, gt, clf=clf, topk=topk)
-
-	logging.debug("Batch Accuracy: {:.4%} (Top1) | {:.4%} (Top{}) {: 3d} / {: 3d}".format(
-
-		np.mean(topk_preds[:, -1] == gt),
-		topk_accu,
-
-		topk,
-		np.sum(topk_preds[:, -1] == gt),
-		len(feats)
-	))
-
-	return topk_preds
 
 def main(args):
 	GPU = args.gpu[0]
 
 	clf = Model.load_svm(args.trained_svm, args.visualize_coefs)
-	scaler, data, it, *model_args = Data.new(args, clf)
+	scaler, it, n_batches, *model_args = Data.new(args, clf)
 	model, prepare = Model.new(args, *model_args)
 
 	logging.info("Using following feature composition: {}".format(args.feature_composition))
@@ -73,9 +57,11 @@ def main(args):
 		xp=model.xp,
 		swap_channels=args.swap_channels,
 	)
-	with outputs(args) as (pred_out, full_out):
 
-		for batch_i, batch in it:
+	propagator = Propagator(model, clf, scaler=scaler, topk=args.topk)
+
+	with outputs(args) as files:
+		for batch_i, batch in tqdm(enumerate(it), total=n_batches):
 
 			batch = [(prepare(im), lab) for im, _, lab in batch]
 			X, y = concat_examples(batch, device=GPU)
@@ -86,25 +72,14 @@ def main(args):
 			if isinstance(feats, tuple):
 				feats = feats[0]
 
-			_feats = scaler.transform(to_cpu(feats.array))
+			with propagator(feats, ims, y) as prop_iter:
 
-			topk_preds = evaluate_batch(_feats, to_cpu(y), clf=clf, topk=args.topk)
+				if args.extract:
+					extract_parts(prop_iter, it, batch_i, files, **kwargs)
 
-			propagator = Propagator(model, feats, ims, y, clf.coef_, topk_preds)
-
-			if args.extract:
-				for i, parts in extract_parts(propagator, **kwargs):
-
-					im_idx = i + batch_i * args.batch_size
-					im_uuid = data.uuids[im_idx]
-
-					for pred_part, full_part in zip(*parts):
-						parts_to_file(im_uuid, *pred_part, out=pred_out)
-						parts_to_file(im_uuid, *full_part, out=full_out)
-
-			else:
-				show_feature_saliency(propagator, **kwargs)
-				break
+				else:
+					show_feature_saliency(prop_iter, **kwargs)
+					break
 
 
 np.seterr(all="raise")
