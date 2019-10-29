@@ -15,8 +15,17 @@ class ImageGradient(object):
 		self.ims = ims
 
 	def __call__(self, coefs=None):
-		return prop_back(self.model, self.feats, self.ims, coefs)
 
+		self.ims.grad = None
+		self.model.cleargrads()
+
+		if coefs is None:
+			F.sum(self.feats).backward()
+		else:
+			F.sum(self.feats[np.where(coefs)]).backward()
+
+		assert self.ims.grad is not None, "Backprop mode is off?"
+		return self.ims.grad
 
 class Propagator(object):
 

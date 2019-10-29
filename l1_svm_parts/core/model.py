@@ -75,6 +75,7 @@ class Model(abc.ABC):
 		if GPU >= 0:
 			chainer.cuda.get_device(GPU).use()
 			model.to_gpu(GPU)
+
 		return model, prepare
 
 	@staticmethod

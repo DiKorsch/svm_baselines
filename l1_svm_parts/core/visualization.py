@@ -149,22 +149,3 @@ def show_feature_saliency(propagator, extractor, xp=np, swap_channels=True,
 			plt.show()
 			plt.close()
 		#####################################################
-
-
-
-		############### Plots Gradients of the selected Features ###############
-		if plot_sel_feats_grad:
-			for feat_idx in np.where(pred_coef)[0]:
-				mask = np.zeros_like(pred_coefs).astype(bool)
-				mask[i, feat_idx] = True
-				_grad = prop_back(feats, ims, mask)
-				_plot_gradient(
-					np.zeros_like(im), _grad[i],
-					ax=None,#axs[0],
-					title="Feat Gradient #{}".format(feat_idx),
-					**kwargs
-				)
-
-				plt.show()
-				plt.close()
-		########################################################################

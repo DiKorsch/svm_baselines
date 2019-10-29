@@ -8,7 +8,6 @@ from tqdm import tqdm
 from cvdatasets.annotations import AnnotationType
 from cvdatasets.utils import new_iterator
 
-from l1_svm_parts.utils import IdentityScaler
 from l1_svm_parts.utils import topk_decision
 
 def evaluate_data(clf, data, subset, topk, scaler):
@@ -21,6 +20,11 @@ def evaluate_data(clf, data, subset, topk, scaler):
 	topk_preds, topk_accu = topk_decision(X, y, clf=clf, topk=topk)
 	logging.info("Top{}-Accuracy on {} subset: {:.4%}".format(topk, subset, topk_accu))
 
+class IdentityScaler(object):
+	"""
+		Do not scale the data, just return itself
+	"""
+	transform = lambda self, x: x
 
 class Data(abc.ABC):
 
