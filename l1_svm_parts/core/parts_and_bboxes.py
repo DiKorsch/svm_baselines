@@ -7,7 +7,7 @@ from functools import partial, wraps
 from scipy.optimize import minimize, Bounds
 
 from l1_svm_parts.utils import ThresholdType
-from l1_svm_parts.utils.image import grad_correction
+from l1_svm_parts.utils import prepare_back
 from l1_svm_parts.utils.clustering import cluster_gradient
 
 
@@ -223,6 +223,7 @@ def get_parts(im, grad, xp=np,
 		middle = (h//2, w//2)
 		return [[i, (middle, h//2, w//2)] for i in range(kwargs["K"])]
 
+	grad = prepare_back(image.saliency_to_im(grad, xp=xp), swap_channels=swap_channels)
 	grad = image.correction(grad, xp, sigma, gamma, swap_channels)
 	boxes, centers, labs = boxes_func(im, grad, **kwargs)
 

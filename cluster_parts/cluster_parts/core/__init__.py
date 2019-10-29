@@ -63,7 +63,7 @@ class BoundingBoxParts(object):
 	"""
 
 	def __init__(self, image, xp=np, *,
-		K=4, optimal=True, gamma=1.0, sigma=1.0, swap_channels=True,
+		K=4, optimal=True, gamma=1.0, sigma=1.0,
 		min_bbox=64, fit_object=False,
 		thresh_type=ThresholdType.Default,
 		cluster_init=ClusterInitType.Default,
@@ -74,7 +74,6 @@ class BoundingBoxParts(object):
 
 		self.gamma = gamma
 		self.sigma = sigma
-		self.swap_channels = swap_channels
 
 		assert K is not None and K > 0, "Positive K is required!"
 		self.K = K
@@ -87,16 +86,15 @@ class BoundingBoxParts(object):
 		self.xp = xp
 
 
-	def __call__(self, saliency, *, xp=None, gamma=None, sigma=None, swap_channels=None, **kwargs):
+	def __call__(self, saliency, *, xp=None, gamma=None, sigma=None, **kwargs):
 		if (saliency == 0).all():
 			import pdb; pdb.set_trace()
 
 		xp = _param_check(xp, self.xp)
 		gamma = _param_check(gamma, self.gamma)
 		sigma = _param_check(sigma, self.sigma)
-		swap_channels = _param_check(swap_channels, self.swap_channels)
 
-		saliency = image.correction(saliency, xp, sigma, gamma, swap_channels)
+		saliency = image.correction(saliency, xp, sigma, gamma)
 
 		centers, labs = self.cluster_saliency(saliency)
 		boxes = self.get_boxes(centers, labs, saliency)
@@ -217,7 +215,7 @@ class BoundingBoxParts(object):
 		return bbox
 
 
-	def cluster_saliency(self, saliency,):
+	def cluster_saliency(self, saliency):
 		im = self.image
 		thresh = self.thresh_type(self.image, saliency)
 		init_coords = self.cluster_init(saliency, self.K)
@@ -226,7 +224,6 @@ class BoundingBoxParts(object):
 			clf = KMeans(self.K)
 
 		else:
-
 			init = self.feature_composition(self.image, saliency, init_coords)
 			clf = KMeans(self.K, init=init, n_init=1)
 

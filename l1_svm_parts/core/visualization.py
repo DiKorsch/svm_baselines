@@ -9,9 +9,8 @@ from matplotlib.gridspec import GridSpec
 
 from functools import partial
 
-# from l1_svm_parts.core.parts_and_bboxes import boxes_func
 from l1_svm_parts.core.propagator import Propagator
-from l1_svm_parts.utils import prop_back
+from l1_svm_parts.utils import prop_back, prepare_back
 
 from cluster_parts import BoundingBoxParts
 from cluster_parts.utils import ThresholdType
@@ -62,13 +61,13 @@ def plot_gradient(im, grad, xp=np, spec=None, title="",
 
 	im_boxes = BoundingBoxParts(im,
 		K=K, xp=xp,
-		swap_channels=swap_channels,
 		gamma=gamma,
 		sigma=sigma,
 		**kwargs,
 	)
 
-	grad = image.correction(grad, xp, sigma, gamma, swap_channels)
+	grad = prepare_back(image.saliency_to_im(grad, xp=xp), swap_channels=swap_channels)
+	grad = image.correction(grad, xp, sigma, gamma)
 	ax2 = imshow(im, ax=ax2, title="Gradient")
 	ax2 = imshow(grad, ax=ax2, alpha=0.7)
 
@@ -138,7 +137,7 @@ def show_feature_saliency(propagator,
 
 		ax0 = plt.subplot(spec[0:2, 0:2])
 
-		im = image.prepare_back(propagator.ims[i], swap_channels=swap_channels)
+		im = prepare_back(propagator.ims[i], swap_channels=swap_channels)
 		title ="Original Image [predicted: {}, GT: {}]".format(pred, gt)
 
 		imshow(im, ax=ax0, title=title)
