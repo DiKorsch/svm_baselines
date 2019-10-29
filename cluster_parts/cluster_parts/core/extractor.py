@@ -11,10 +11,6 @@ from cluster_parts.utils import ClusterInitType
 from cluster_parts.utils import ThresholdType
 from cluster_parts.utils import FeatureComposition
 
-def _param_check(param, default):
-	return default if param is None else param
-
-
 def _check_min_bbox(bbox, min_bbox):
 	y0, x0, y1, x1 = bbox
 	h, w = y1 - y0, x1 - x0
@@ -43,6 +39,30 @@ def _check_min_bbox(bbox, min_bbox):
 	logging.debug(text)
 	logging.debug("=" * len(text))
 	return bbox
+
+class EnlargeBbox(object):
+	def __init__(self, factor):
+		self.factor = factor
+
+	def __call__(self, func):
+
+		@wraps(func)
+		def inner(mask, *args, **kwargs):
+			im_h, im_w = mask.shape
+			bbox = func(mask, *args, **kwargs)
+			if self.factor <= 0:
+				return bbox
+
+			y0, x0, y1, x1 = bbox
+
+			w, h = x1 - x0, y1 - y0
+			dx = w * self.factor / 2
+			dy = h * self.factor / 2
+
+			y0, x0 = max(y0 - dy, 0), max(x0 - dx, 0)
+			y1, x1 = min(y1 + dy, im_h), min(x1 + dx, im_w)
+			return y0, x0, y1, x1
+		return inner
 
 
 class BoundingBoxPartExtractor(object):
@@ -125,6 +145,7 @@ class BoundingBoxPartExtractor(object):
 
 		return res
 
+	# @EnlargeBbox(factor=0.2)
 	def fit_bbox(self, mask, saliency):
 		ys, xs = np.where(mask)
 		bbox = np.array([min(ys), min(xs), max(ys), max(xs)])

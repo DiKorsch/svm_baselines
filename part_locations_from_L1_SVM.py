@@ -203,14 +203,8 @@ def init_data(args, clf=None):
 	return scaler, data, it, model_info, n_classes
 
 
-feature_composition = [
-	FeatureType.COORDS,
-	# FeatureType.SALIENCY,
-	# FeatureType.RGB,
-]
 
 def main(args):
-	global feature_composition
 
 	clf = load_svm(args)
 
@@ -223,7 +217,7 @@ def main(args):
 		chainer.cuda.get_device(GPU).use()
 		model.to_gpu(GPU)
 
-	logging.info("Using following feature composition: {}".format(feature_composition))
+	logging.info("Using following feature composition: {}".format(args.feature_composition))
 
 	kwargs = dict(
 		extractor=BoundingBoxPartExtractor(
@@ -233,7 +227,7 @@ def main(args):
 			thresh_type=args.thresh_type,
 			cluster_init=ClusterInitType.MAXIMAS,
 
-			feature_composition=feature_composition,
+			feature_composition=args.feature_composition,
 		),
 		xp=model.xp,
 		swap_channels=args.swap_channels,

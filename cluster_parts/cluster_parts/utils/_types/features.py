@@ -43,7 +43,10 @@ class FeatureComposition(object):
 
 
 	def __call__(self, *args, **kwargs):
-		feats = [comp(*args, **kwargs) for comp in self.composition]
-		return np.hstack(feats).transpose()
+		feats = []
+		for comp in self.composition:
+			feats.extend(comp(*args, **kwargs))
+
+		return np.stack(feats).transpose()
 
 

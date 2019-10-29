@@ -1,4 +1,6 @@
-from cvargparse import GPUParser, ArgFactory, Arg
+from cvargparse import Arg
+from cvargparse import ArgFactory
+from cvargparse import GPUParser
 
 from chainer_addons.models import PrepareType
 
@@ -10,7 +12,10 @@ DEFAULT_INFO_FILE=os.environ.get("DATA", "/home/korsch/Data/info.yml")
 info_file = read_info_file(DEFAULT_INFO_FILE)
 
 
-from cluster_parts.utils import ThresholdType, ClusterInitType
+from cluster_parts.utils import ClusterInitType
+from cluster_parts.utils import FeatureComposition
+from cluster_parts.utils import FeatureType
+from cluster_parts.utils import ThresholdType
 
 def parse_args():
 	parser = GPUParser(ArgFactory([
@@ -51,6 +56,10 @@ def parse_args():
 			ThresholdType.as_arg("thresh_type",
 				help_text="type of gradient thresholding"),
 
+			FeatureType.as_arg("feature_composition",
+				nargs="+", default=FeatureComposition.Default,
+				help_text="composition of features"),
+
 			Arg("--K", type=int, default=4),
 
 			Arg("--gamma", type=float, default=0.7,
@@ -58,9 +67,6 @@ def parse_args():
 
 			Arg("--sigma", type=float, default=5,
 				help="Gaussian smoothing strength"),
-
-
-
 		])\
 	.batch_size()
 	)

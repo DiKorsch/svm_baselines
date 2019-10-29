@@ -104,9 +104,7 @@ def plot_gradient(extractor, im, grad, peak_size=None, spec=None):
 	return ax1
 
 
-def show_feature_saliency(propagator, extractor,
-	xp=np,
-	swap_channels=True,
+def show_feature_saliency(propagator, extractor, xp=np, swap_channels=True,
 	plot_topk_grads=False,
 	plot_sel_feats_grad=False):
 
