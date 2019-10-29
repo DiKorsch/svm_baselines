@@ -32,6 +32,7 @@ from l1_svm_parts.core.extraction import parts_to_file, extract_parts
 from l1_svm_parts.core.propagator import Propagator
 
 from cluster_parts.utils import ClusterInitType
+from cluster_parts.utils import FeatureType
 
 @contextmanager
 def outputs(args):
@@ -198,9 +199,9 @@ def init_data(args, clf=None):
 
 
 feature_composition = [
-	"coords",
-	# "grad",
-	# "RGB"
+	FeatureType.COORDS,
+	# FeatureType.SALIENCY,
+	# FeatureType.RGB,
 ]
 
 def main(args):

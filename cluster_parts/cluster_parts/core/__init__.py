@@ -9,39 +9,13 @@ from sklearn.cluster import KMeans
 
 from cluster_parts.utils import ClusterInitType
 from cluster_parts.utils import ThresholdType
+from cluster_parts.utils import FeatureComposition
 from cluster_parts.utils import image
 
 
 def _param_check(param, default):
 	return default if param is None else param
 
-def _norm(arr):
-	arr = arr - arr.min()
-	arr_max = arr.max()
-	if arr_max == 0:
-		return arr
-	else:
-		return arr / arr_max
-
-def _as_cluster_feats(im, saliency, coords, feature_composition=None):
-	ys, xs = coords
-	_im = im[ys, xs]
-
-	composition = dict(
-		coords=[_norm(ys), _norm(xs)],
-		saliency=[_norm(saliency[ys, xs].ravel())],
-		RGB=[_norm(_im[:, i].ravel()) for i in range(3)],
-	)
-
-	if feature_composition is None:
-		feature_composition = ["coords", "saliency", "RGB"]
-
-	cluster_feats = []
-	for key in feature_composition:
-		assert key in composition
-		cluster_feats.extend(composition[key])
-
-	return np.stack(cluster_feats).transpose()
 
 def _check_min_bbox(bbox, min_bbox):
 	y0, x0, y1, x1 = bbox
@@ -93,7 +67,7 @@ class BoundingBoxParts(object):
 		min_bbox=64, fit_object=False,
 		thresh_type=ThresholdType.Default,
 		cluster_init=ClusterInitType.Default,
-		feature_composition=["coords"]):
+		feature_composition=FeatureComposition.Default):
 		super(BoundingBoxParts, self).__init__()
 
 		self.image = image
@@ -107,7 +81,7 @@ class BoundingBoxParts(object):
 		self.optimal = optimal
 		self.thresh_type = ThresholdType.get(thresh_type)
 		self.cluster_init = ClusterInitType.get(cluster_init)
-		self.feature_composition = feature_composition
+		self.feature_composition = FeatureComposition(feature_composition)
 		self.fit_object = fit_object
 		self.min_bbox = min_bbox
 		self.xp = xp
@@ -250,9 +224,10 @@ class BoundingBoxParts(object):
 
 		if init_coords is None:
 			clf = KMeans(self.K)
+
 		else:
-			init = _as_cluster_feats(self.image, saliency, init_coords,
-				self.feature_composition)
+
+			init = self.feature_composition(self.image, saliency, init_coords)
 			clf = KMeans(self.K, init=init, n_init=1)
 
 		### get x,y coordinates of pixels to cluster
@@ -267,8 +242,7 @@ class BoundingBoxParts(object):
 			idxs = np.arange(np.multiply(*saliency.shape))
 			coords = np.unravel_index(idxs, saliency.shape)
 
-		data = _as_cluster_feats(self.image, saliency, coords,
-			self.feature_composition)
+		data = self.feature_composition(self.image, saliency, coords)
 
 		clf.fit(data)
 
