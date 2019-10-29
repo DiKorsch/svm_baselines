@@ -3,12 +3,12 @@ import numpy as np
 from scipy.ndimage.filters import gaussian_filter
 
 
-def saliency_to_im(saliency, xp=np, keepdims=True):
-	return xp.abs(saliency).mean(axis=0, keepdims=keepdims)
+def saliency_to_im(saliency, chan_axis=0, xp=np, keepdims=True):
+	"""Compute absolute mean over the channel axis"""
+	return xp.abs(saliency).mean(axis=chan_axis, keepdims=keepdims)
 
 def correction(saliency, xp=np, sigma=None, gamma=1.):
-
-	# saliency = prepare_back(saliency_to_im(saliency), swap_channels)
+	"""Apply an optional gaussian filter and gamma correction"""
 
 	if sigma is None:
 		saliency = saliency.squeeze()

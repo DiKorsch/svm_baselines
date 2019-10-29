@@ -239,14 +239,14 @@ def main(args):
 
 			kwargs = dict(
 
-				xp=model.xp,
 				peak_size=None, #int(h * 0.35 / 2),
+
+				xp=model.xp,
 				swap_channels=args.swap_channels,
 
 				gamma=args.gamma,
 				sigma=args.sigma,
 				K=args.K,
-				alpha=1,
 				thresh_type=args.thresh_type,
 				cluster_init=ClusterInitType.MAXIMAS,
 

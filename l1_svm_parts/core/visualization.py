@@ -53,18 +53,13 @@ def visualize_coefs(coefs, **kwargs):
 
 def plot_gradient(im, grad, xp=np, spec=None, title="",
 	swap_channels=True,
-	alpha=0.5, gamma=1.0, sigma=1,
-	peak_size=None, K=None, **kwargs):
+	gamma=1.0, sigma=1.0,
+	peak_size=None, **kwargs):
 
 	ax1 = plt.subplot(spec[2:4, 0:2])
 	ax2 = plt.subplot(spec[0:2, 2:4])
 
-	im_boxes = BoundingBoxParts(im,
-		K=K, xp=xp,
-		gamma=gamma,
-		sigma=sigma,
-		**kwargs,
-	)
+	im_boxes = BoundingBoxParts(im, xp=xp, gamma=gamma, sigma=sigma, **kwargs)
 
 	grad = prepare_back(image.saliency_to_im(grad, xp=xp), swap_channels=swap_channels)
 	grad = image.correction(grad, xp, sigma, gamma)
@@ -77,14 +72,14 @@ def plot_gradient(im, grad, xp=np, spec=None, title="",
 	new_grad[thresh_mask] = grad[thresh_mask]
 
 	# new_grad = grad.copy()
-	ax1 = imshow(new_grad, ax=ax1, cmap=plt.cm.gray, alpha=alpha)
+	ax1 = imshow(new_grad, ax=ax1, cmap=plt.cm.gray, alpha=1.0)
 	# ax = imshow(thresh_mask, ax=ax, cmap=plt.cm.Reds, alpha=0.4)
 
-	if K is not None and K > 0:
+	if im_boxes.K is not None and im_boxes.K > 0:
 		cmap = plt.cm.viridis_r
 
 		cluster_init = ClusterInitType.get(kwargs["cluster_init"])
-		ys, xs = init_coords = cluster_init(grad, K)
+		ys, xs = init_coords = cluster_init(grad, im_boxes.K)
 		ax1.scatter(xs, ys, marker="x", color="black")
 
 		centers, labs = im_boxes.cluster_saliency(grad)
@@ -98,7 +93,7 @@ def plot_gradient(im, grad, xp=np, spec=None, title="",
 
 		imshow(labs, ax1, cmap=cmap, alpha=0.3)
 
-		for i in range(K):
+		for i in range(im_boxes.K):
 			row, col = np.unravel_index(i, (2, 2))
 			_ax = plt.subplot(spec[row + 2, col + 2])
 			_c, ((x, y), w, h) = boxes[i]
