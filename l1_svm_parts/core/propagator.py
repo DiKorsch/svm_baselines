@@ -4,6 +4,8 @@ import numpy as np
 
 from chainer.backends import cuda
 from contextlib import contextmanager
+from multiprocessing.dummy import Pool
+from multiprocessing.pool import AsyncResult
 
 from l1_svm_parts.utils import topk_decision
 from l1_svm_parts.utils import prepare_back
@@ -37,13 +39,15 @@ class ImageGradient(object):
 
 class Propagator(object):
 
-	def __init__(self, model, clf, scaler, topk, swap_channels=True):
+	def __init__(self, model, clf, scaler, topk, swap_channels=True, n_jobs=1):
 		super(Propagator, self).__init__()
 		self.model = model
 		self.clf = clf
 		self.topk = topk
 		self.swap_channels = swap_channels
 		self.scaler = scaler
+
+		self.pool = Pool(n_jobs) if n_jobs >= 1 else None
 
 		self.reset()
 
@@ -73,12 +77,25 @@ class Propagator(object):
 
 		im_grad = ImageGradient(self.model, feats, ims)
 
-		self.full_im_grad = im_grad()
+		if self.pool is None:
 
-		# gt_im_grad = im_grad(gt_coefs != 0)
+			self.full_im_grad = im_grad()
 
-		topk_pred_im_grad = [im_grad(p != 0) for p in topk_pred_coefs]
-		self.pred_im_grad = topk_pred_im_grad[-1]
+			# gt_im_grad = im_grad(gt_coefs != 0)
+			# topk_pred_im_grad = [im_grad(p != 0) for p in topk_pred_coefs]
+
+			self.pred_im_grad = im_grad(topk_pred_coefs[-1] != 0)
+
+		else:
+
+			self.full_im_grad = self.pool.apply_async(im_grad)
+
+			# gt_im_grad = im_grad(gt_coefs != 0)
+			# topk_pred_im_grad = [im_grad(p != 0) for p in topk_pred_coefs]
+
+			self.pred_im_grad = self.pool.apply_async(im_grad,
+				args=(topk_pred_coefs[-1] != 0,))
+
 
 		yield self
 
@@ -92,17 +109,21 @@ class Propagator(object):
 		if self.i >= len(self.ims):
 			raise StopIteration
 
-		i = self.i
+		im = self.prepare_back(self.ims)
+		pred_grad = self.prepare_back(self.pred_im_grad, is_grad=True)
+		full_grad = self.prepare_back(self.full_im_grad, is_grad=True)
+
+		pred, gt = self.topk_preds[self.i, -1], self.labs[self.i]
+
 		self.i += 1
-		im = self.prepare_back(self.ims[i])
-		pred_grad = self.prepare_back(self.pred_im_grad[i], is_grad=True)
-		full_grad = self.prepare_back(self.full_im_grad[i], is_grad=True)
-
-		pred, gt = self.topk_preds[i, -1], self.labs[i]
-		return i, im, (pred_grad, full_grad), (pred, gt)
+		return self.i - 1, im, (pred_grad, full_grad), (pred, gt)
 
 
-	def prepare_back(self, im, is_grad=False):
+	def prepare_back(self, batch, is_grad=False):
+		if isinstance(batch, AsyncResult):
+			batch = batch.get()
+
+		im = batch[self.i]
 		if is_grad:
 			im = saliency_to_im(im, xp=self.model.xp)
 		return prepare_back(im, swap_channels=self.swap_channels)
