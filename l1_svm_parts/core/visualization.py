@@ -9,10 +9,6 @@ from matplotlib.patches import Rectangle
 
 from functools import partial
 
-from l1_svm_parts.core.propagator import Propagator
-from l1_svm_parts.utils import prepare_back
-from l1_svm_parts.utils import saliency_to_im
-
 from cluster_parts.core import BoundingBoxPartExtractor
 from cluster_parts.utils import ClusterInitType
 from cluster_parts.utils import ThresholdType
@@ -101,29 +97,22 @@ def plot_gradient(extractor, im, grad, peak_size=None, spec=None):
 		ys, xs = peaks.T
 		ax.scatter(xs, ys, marker="x", c="blue")
 
-
 	return ax1
 
 
-def show_feature_saliency(propagator, extractor, xp=np, swap_channels=True,
-	plot_topk_grads=False,
-	plot_sel_feats_grad=False):
+def show_feature_saliency(propagator, extractor, plot_topk_grads=False):
 
-	for i, (full_grad, pred_grad) in propagator:
-		pred, gt = propagator.topk_preds[i, -1], propagator.labs[i]
+	for i, im, (pred_grad, full_grad), (pred, gt) in propagator:
+
 		logging.debug("predicted class: {}, GT class: {}".format(pred, gt))
+		title ="Original Image [predicted: {}, GT: {}]".format(pred, gt)
 
 		spec = GridSpec(4, 4)
 		fig = plt.figure(figsize=(16, 9))
-
 		ax0 = plt.subplot(spec[0:2, 0:2])
 
-		im = prepare_back(propagator.ims[i], swap_channels=swap_channels)
-		title ="Original Image [predicted: {}, GT: {}]".format(pred, gt)
-
 		imshow(im, ax=ax0, title=title)
-		grad = prepare_back(saliency_to_im(pred_grad, xp=xp), swap_channels=swap_channels)
-		plot_gradient(extractor, im, grad, spec=spec)
+		plot_gradient(extractor, im, pred_grad, spec=spec)
 
 		plt.tight_layout()
 		plt.show()

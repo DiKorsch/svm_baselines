@@ -6,6 +6,8 @@ from chainer.backends import cuda
 from contextlib import contextmanager
 
 from l1_svm_parts.utils import topk_decision
+from l1_svm_parts.utils import prepare_back
+from l1_svm_parts.utils import saliency_to_im
 
 class ImageGradient(object):
 	"""
@@ -35,11 +37,12 @@ class ImageGradient(object):
 
 class Propagator(object):
 
-	def __init__(self, model, clf, scaler, topk):
+	def __init__(self, model, clf, scaler, topk, swap_channels=True):
 		super(Propagator, self).__init__()
 		self.model = model
 		self.clf = clf
 		self.topk = topk
+		self.swap_channels = swap_channels
 		self.scaler = scaler
 
 		self.reset()
@@ -82,7 +85,27 @@ class Propagator(object):
 		self.reset()
 
 	def __iter__(self):
-		return enumerate(zip(self.full_im_grad, self.pred_im_grad))
+		self.i = 0
+		return self
+
+	def __next__(self):
+		if self.i >= len(self.ims):
+			raise StopIteration
+
+		i = self.i
+		self.i += 1
+		im = self.prepare_back(self.ims[i])
+		pred_grad = self.prepare_back(self.pred_im_grad[i], is_grad=True)
+		full_grad = self.prepare_back(self.full_im_grad[i], is_grad=True)
+
+		pred, gt = self.topk_preds[i, -1], self.labs[i]
+		return i, im, (pred_grad, full_grad), (pred, gt)
+
+
+	def prepare_back(self, im, is_grad=False):
+		if is_grad:
+			im = saliency_to_im(im, xp=self.model.xp)
+		return prepare_back(im, swap_channels=self.swap_channels)
 
 	def evaluate_batch(self, feats, gt):
 

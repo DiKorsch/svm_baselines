@@ -44,21 +44,20 @@ def main(args):
 
 	logging.info("Using following feature composition: {}".format(args.feature_composition))
 
-	kwargs = dict(
-		extractor=BoundingBoxPartExtractor(
-			corrector=Corrector(gamma=args.gamma, sigma=args.sigma),
+	extractor = BoundingBoxPartExtractor(
+		corrector=Corrector(gamma=args.gamma, sigma=args.sigma),
 
-			K=args.K,
-			thresh_type=args.thresh_type,
-			cluster_init=ClusterInitType.MAXIMAS,
+		K=args.K,
+		thresh_type=args.thresh_type,
+		cluster_init=ClusterInitType.MAXIMAS,
 
-			feature_composition=args.feature_composition,
-		),
-		xp=model.xp,
-		swap_channels=args.swap_channels,
+		feature_composition=args.feature_composition,
 	)
 
-	propagator = Propagator(model, clf, scaler=scaler, topk=args.topk)
+	propagator = Propagator(model, clf,
+		scaler=scaler,
+		topk=args.topk,
+		swap_channels=args.swap_channels)
 
 	with outputs(args) as files:
 		for batch_i, batch in tqdm(enumerate(it), total=n_batches):
@@ -75,10 +74,10 @@ def main(args):
 			with propagator(feats, ims, y) as prop_iter:
 
 				if args.extract:
-					extract_parts(prop_iter, it, batch_i, files, **kwargs)
+					extract_parts(prop_iter, it, batch_i, files, extractor=extractor)
 
 				else:
-					show_feature_saliency(prop_iter, **kwargs)
+					show_feature_saliency(prop_iter, extractor=extractor)
 					break
 
 
