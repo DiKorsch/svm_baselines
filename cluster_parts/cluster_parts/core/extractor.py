@@ -3,13 +3,15 @@ import numpy as np
 
 from functools import partial
 from functools import wraps
+from multiprocessing.dummy import Pool
+from multiprocessing.pool import AsyncResult
 from scipy.optimize import Bounds
 from scipy.optimize import minimize
 from sklearn.cluster import KMeans
 
 from cluster_parts.utils import ClusterInitType
-from cluster_parts.utils import ThresholdType
 from cluster_parts.utils import FeatureComposition
+from cluster_parts.utils import ThresholdType
 
 def _check_min_bbox(bbox, min_bbox):
 	y0, x0, y1, x1 = bbox
@@ -85,7 +87,8 @@ class BoundingBoxPartExtractor(object):
 		min_bbox=64, fit_object=False,
 		thresh_type=ThresholdType.Default,
 		cluster_init=ClusterInitType.Default,
-		feature_composition=FeatureComposition.Default):
+		feature_composition=FeatureComposition.Default,
+		n_jobs=2):
 		super(BoundingBoxPartExtractor, self).__init__()
 
 		self.corrector = corrector
@@ -99,10 +102,22 @@ class BoundingBoxPartExtractor(object):
 		self.fit_object = fit_object
 		self.min_bbox = min_bbox
 
+		self.pool = Pool(n_jobs) if n_jobs >= 1 else None
 
-	def __call__(self, image, saliency):
-		if (saliency == 0).all():
-			import pdb; pdb.set_trace()
+
+	def __call__(self, image, saliencies):
+
+		_func = lambda saliency: self.__call_single__(image=image, saliency=saliency)
+		if self.pool is None:
+			_map = map
+		else:
+			_map = self.pool.map
+
+		return _map(_func, saliencies)
+
+	def __call_single__(self, image, saliency):
+		# if (saliency == 0).all():
+		# 	import pdb; pdb.set_trace()
 
 		saliency = self.corrector(saliency)
 		centers, labs = self.cluster_saliency(image, saliency)
@@ -182,6 +197,8 @@ class BoundingBoxPartExtractor(object):
 				ratio = (_h/_w) if _w != 0 else -100
 			else:
 				ratio = (_w/_h) if _h != 0 else -100
+
+			##### THIS IS THE SLOWEST PART, BECAUSE IT IS CALLED MANY TIMES!
 
 			TP = area.sum()
 			FP = (1-area).sum()

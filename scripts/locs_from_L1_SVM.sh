@@ -17,6 +17,7 @@ OPTS="${OPTS} --n_jobs $N_JOBS"
 OPTS="${OPTS} --prepare_type $PREPARE_TYPE"
 
 # OPTS="${OPTS} --scale_features"
+export OMP_NUM_THREADS=1
 
 SCRIPT="../part_locations_from_L1_SVM.py"
 

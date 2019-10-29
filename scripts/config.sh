@@ -3,7 +3,17 @@ if [[ ! -f /.dockerenv ]]; then
 	conda activate chainer5
 fi
 
-PYTHON=${PYTHON:-python}
+if [[ $GDB == "1" ]]; then
+	PYTHON="gdb -ex run --args python"
+
+elif [[ $PROFILE == "1" ]]; then
+	PYTHON="python -m cProfile -o profile"
+
+else
+	PYTHON="python"
+
+fi
+
 
 MODEL_TYPE=${MODEL_TYPE:-inception}
 

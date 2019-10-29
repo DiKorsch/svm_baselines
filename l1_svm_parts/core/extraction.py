@@ -11,7 +11,7 @@ def extract_parts(propagator, it, batch_i, files, extractor):
 
 	for i, im, (pred_grad, full_grad), _ in propagator:
 
-		parts = [extractor(im, pred_grad), extractor(im, full_grad)]
+		parts = extractor(im, [pred_grad, full_grad])
 
 		im_idx = i + batch_i * it.batch_size
 		im_uuid = it.dataset.uuids[im_idx]

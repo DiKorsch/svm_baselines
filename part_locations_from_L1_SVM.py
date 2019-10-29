@@ -52,12 +52,15 @@ def main(args):
 		cluster_init=ClusterInitType.MAXIMAS,
 
 		feature_composition=args.feature_composition,
+		n_jobs=-1,
 	)
 
 	propagator = Propagator(model, clf,
 		scaler=scaler,
 		topk=args.topk,
-		swap_channels=args.swap_channels)
+		swap_channels=args.swap_channels,
+		n_jobs=-1,
+	)
 
 	with outputs(args) as files:
 		for batch_i, batch in tqdm(enumerate(it), total=n_batches):
