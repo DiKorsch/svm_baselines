@@ -40,3 +40,10 @@ class IdentityScaler(object):
 		Do not scale the data, just return itself
 	"""
 	transform = lambda self, x: x
+
+
+def topk_decision(X, y, clf, topk):
+	decs = clf.decision_function(X)
+	topk_preds = np.argsort(decs)[:, -topk:]
+	topk_accu = (topk_preds == np.expand_dims(y, 1)).max(axis=1).mean()
+	return topk_preds, topk_accu
