@@ -3,6 +3,10 @@ import chainer.functions as F
 
 from chainer.backends import cuda
 
+def saliency_to_im(saliency, chan_axis=0, xp=np, keepdims=True):
+	"""Compute absolute mean over the channel axis"""
+	return xp.abs(saliency).mean(axis=chan_axis, keepdims=keepdims)
+
 def normalize(im, axis=(1,2)):
 	im = im - im.min(axis=axis, keepdims=True)
 	chan_max = im.max(axis=axis, keepdims=True)

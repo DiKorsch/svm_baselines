@@ -2,35 +2,40 @@
 if __name__ != '__main__': raise Exception("Do not import me!")
 
 import chainer
-import numpy as np
 import joblib
 import logging
+import numpy as np
 
-from os.path import join
-from tqdm import tqdm
-from sklearn.preprocessing import MinMaxScaler
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
+from os.path import join
+from sklearn.preprocessing import MinMaxScaler
+from tqdm import tqdm
 
-from functools import partial
 from contextlib import contextmanager
+from functools import partial
 
 from cvdatasets.annotations import AnnotationType
 from cvdatasets.utils import new_iterator
 
+from chainer_addons.links import PoolingType
 from chainer_addons.models import ModelType
 from chainer_addons.models import PrepareType
-from chainer_addons.links import PoolingType
 from chainer_addons.utils.imgproc import _center_crop
 
 from chainer.cuda import to_cpu
 from chainer.dataset.convert import concat_examples
 
-from l1_svm_parts.utils import arguments, IdentityScaler
-from l1_svm_parts.core.visualization import show_feature_saliency, visualize_coefs
-from l1_svm_parts.core.extraction import parts_to_file, extract_parts
+from l1_svm_parts.core.extraction import extract_parts
+from l1_svm_parts.core.extraction import parts_to_file
 from l1_svm_parts.core.propagator import Propagator
+from l1_svm_parts.core.visualization import show_feature_saliency
+from l1_svm_parts.core.visualization import visualize_coefs
+from l1_svm_parts.utils import IdentityScaler
+from l1_svm_parts.utils import arguments
 
+from cluster_parts.core import BoundingBoxPartExtractor
+from cluster_parts.core import Corrector
 from cluster_parts.utils import ClusterInitType
 from cluster_parts.utils import FeatureType
 
@@ -220,6 +225,19 @@ def main(args):
 
 	logging.info("Using following feature composition: {}".format(feature_composition))
 
+	kwargs = dict(
+		extractor=BoundingBoxPartExtractor(
+			corrector=Corrector(gamma=args.gamma, sigma=args.sigma),
+
+			K=args.K,
+			thresh_type=args.thresh_type,
+			cluster_init=ClusterInitType.MAXIMAS,
+
+			feature_composition=feature_composition,
+		),
+		xp=model.xp,
+		swap_channels=args.swap_channels,
+	)
 	with outputs(args) as (pred_out, full_out):
 
 		for batch_i, batch in it:
@@ -237,26 +255,9 @@ def main(args):
 
 			topk_preds = evaluate_batch(_feats, to_cpu(y), clf=clf, topk=args.topk)
 
-			kwargs = dict(
-
-				peak_size=None, #int(h * 0.35 / 2),
-
-				xp=model.xp,
-				swap_channels=args.swap_channels,
-
-				gamma=args.gamma,
-				sigma=args.sigma,
-				K=args.K,
-				thresh_type=args.thresh_type,
-				cluster_init=ClusterInitType.MAXIMAS,
-
-				feature_composition=feature_composition
-			)
-
 			propagator = Propagator(model, feats, ims, y, clf.coef_, topk_preds)
 
 			if args.extract:
-
 				for i, parts in extract_parts(propagator, **kwargs):
 
 					im_idx = i + batch_i * args.batch_size

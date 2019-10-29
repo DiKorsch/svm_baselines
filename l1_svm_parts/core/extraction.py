@@ -4,24 +4,21 @@ from chainer.cuda import to_cpu
 from functools import partial
 
 from l1_svm_parts.core.propagator import Propagator
-from l1_svm_parts.utils import prepare_back
+from l1_svm_parts.utils import prepare_back, saliency_to_im
 
-from cluster_parts import BoundingBoxParts
-from cluster_parts.utils import image
+from cluster_parts.core import BoundingBoxPartExtractor
 
-def extract_parts(propagator, xp=np, swap_channels=True, **kwargs):
-
+def extract_parts(propagator, extractor, xp=np, swap_channels=True, **kwargs):
 
 	for i, grads in propagator:
 		im = prepare_back(propagator.ims[i], swap_channels=swap_channels)
 
-		parts = BoundingBoxParts(im, xp=xp, **kwargs)
 
-		pred_grad, full_grad = [prepare_back(image.saliency_to_im(grad, xp=xp), swap_channels=swap_channels)
+		pred_grad, full_grad = [prepare_back(saliency_to_im(grad, xp=xp), swap_channels=swap_channels)
 			for grad in grads]
 
-		pred_parts = parts(pred_grad)
-		full_parts = parts(full_grad)
+		pred_parts = extractor(im, pred_grad)
+		full_parts = extractor(im, full_grad)
 		yield i, (pred_parts, full_parts)
 
 def parts_to_file(im_id, part_id, box, out):

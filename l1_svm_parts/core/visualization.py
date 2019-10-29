@@ -10,12 +10,11 @@ from matplotlib.gridspec import GridSpec
 from functools import partial
 
 from l1_svm_parts.core.propagator import Propagator
-from l1_svm_parts.utils import prop_back, prepare_back
+from l1_svm_parts.utils import prop_back, prepare_back, saliency_to_im
 
-from cluster_parts import BoundingBoxParts
+from cluster_parts.core import BoundingBoxPartExtractor
 from cluster_parts.utils import ThresholdType
 from cluster_parts.utils import ClusterInitType
-from cluster_parts.utils import image
 
 def imshow(im, ax=None, title=None, figsize=(32, 18), **kwargs):
 	if ax is None:
@@ -51,23 +50,17 @@ def visualize_coefs(coefs, **kwargs):
 	plt.close()
 
 
-def plot_gradient(im, grad, xp=np, spec=None, title="",
-	swap_channels=True,
-	gamma=1.0, sigma=1.0,
-	peak_size=None, **kwargs):
+def plot_gradient(extractor, im, grad, peak_size=None, spec=None):
 
 	ax1 = plt.subplot(spec[2:4, 0:2])
 	ax2 = plt.subplot(spec[0:2, 2:4])
 
-	im_boxes = BoundingBoxParts(im, xp=xp, gamma=gamma, sigma=sigma, **kwargs)
+	grad = extractor.corrector(grad)
 
-	grad = prepare_back(image.saliency_to_im(grad, xp=xp), swap_channels=swap_channels)
-	grad = image.correction(grad, xp, sigma, gamma)
 	ax2 = imshow(im, ax=ax2, title="Gradient")
 	ax2 = imshow(grad, ax=ax2, alpha=0.7)
 
-	thresh_type = ThresholdType.get(kwargs["thresh_type"])
-	thresh_mask = thresh_type(im, grad)
+	thresh_mask = extractor.thresh_type(im, grad)
 	new_grad = np.zeros_like(grad)
 	new_grad[thresh_mask] = grad[thresh_mask]
 
@@ -75,36 +68,34 @@ def plot_gradient(im, grad, xp=np, spec=None, title="",
 	ax1 = imshow(new_grad, ax=ax1, cmap=plt.cm.gray, alpha=1.0)
 	# ax = imshow(thresh_mask, ax=ax, cmap=plt.cm.Reds, alpha=0.4)
 
-	if im_boxes.K is not None and im_boxes.K > 0:
-		cmap = plt.cm.viridis_r
+	if extractor.K is None or extractor.K <= 0:
+		return
 
-		cluster_init = ClusterInitType.get(kwargs["cluster_init"])
-		ys, xs = init_coords = cluster_init(grad, im_boxes.K)
-		ax1.scatter(xs, ys, marker="x", color="black")
+	cmap = plt.cm.viridis_r
 
-		centers, labs = im_boxes.cluster_saliency(grad)
-		boxes = im_boxes.get_boxes(centers, labs, grad)
+	ys, xs = init_coords = extractor.cluster_init(grad, extractor.K)
+	ax1.scatter(xs, ys, marker="x", color="black")
 
-		for c, box in boxes:
-			ax1.add_patch(Rectangle(
-				*box, fill=False,
-				linewidth=3,
-				color=cmap(c / len(boxes))))
+	centers, labs = extractor.cluster_saliency(im, grad)
+	boxes = extractor.get_boxes(centers, labs, grad)
 
-		imshow(labs, ax1, cmap=cmap, alpha=0.3)
+	for c, box in boxes:
+		ax1.add_patch(Rectangle(
+			*box, fill=False,
+			linewidth=3,
+			color=cmap(c / len(boxes))))
 
-		for i in range(im_boxes.K):
-			row, col = np.unravel_index(i, (2, 2))
-			_ax = plt.subplot(spec[row + 2, col + 2])
-			_c, ((x, y), w, h) = boxes[i]
-			x,y,w,h = map(int, [x,y,w,h])
-			imshow(im[y:y+h, x:x+w], _ax, title="Part #{}".format(i+1))
+	imshow(labs, ax1, cmap=cmap, alpha=0.3)
+
+	for i in range(extractor.K):
+		row, col = np.unravel_index(i, (2, 2))
+		_ax = plt.subplot(spec[row + 2, col + 2])
+		_c, ((x, y), w, h) = boxes[i]
+		x,y,w,h = map(int, [x,y,w,h])
+		imshow(im[y:y+h, x:x+w], _ax, title="Part #{}".format(i+1))
 
 	if peak_size is not None:
-		peaks = peak_local_max(
-				grad,
-				min_distance=peak_size,
-				exclude_border=False)
+		peaks = peak_local_max(grad, min_distance=peak_size, exclude_border=False)
 
 		ys, xs = peaks.T
 		ax.scatter(xs, ys, marker="x", c="blue")
@@ -113,15 +104,11 @@ def plot_gradient(im, grad, xp=np, spec=None, title="",
 	return ax1
 
 
-def show_feature_saliency(propagator,
+def show_feature_saliency(propagator, extractor,
+	xp=np,
 	swap_channels=True,
-	normalize_grads=False,
 	plot_topk_grads=False,
-	plot_sel_feats_grad=False,
-	**kwargs):
-
-	_plot_gradient = partial(plot_gradient,
-		swap_channels=swap_channels, **kwargs)
+	plot_sel_feats_grad=False):
 
 	for i, (full_grad, pred_grad) in propagator:
 		pred, gt = propagator.topk_preds[i, -1], propagator.labs[i]
@@ -136,7 +123,8 @@ def show_feature_saliency(propagator,
 		title ="Original Image [predicted: {}, GT: {}]".format(pred, gt)
 
 		imshow(im, ax=ax0, title=title)
-		_plot_gradient(im, pred_grad, spec=spec, title="Fitted Boxes")
+		grad = prepare_back(saliency_to_im(pred_grad, xp=xp), swap_channels=swap_channels)
+		plot_gradient(extractor, im, grad, spec=spec)
 
 		plt.tight_layout()
 		plt.show()
