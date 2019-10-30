@@ -101,7 +101,7 @@ class BoundingBoxPartExtractor(object):
 		self.min_bbox = min_bbox
 
 	def __call__(self, image, saliency):
-		if isinstance(saliency, list):
+		if isinstance(saliency, (list, tuple)):
 			return [self(image, sal) for sal in saliency]
 
 		# if (saliency == 0).all():

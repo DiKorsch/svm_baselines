@@ -1,9 +1,12 @@
 import numpy as np
+import threading
+import logging
+import time
 
 from chainer.cuda import to_cpu
 
 from functools import partial
-from multiprocessing.pool import Pool
+from multiprocessing import Pool, Manager
 
 from cluster_parts.core import BoundingBoxPartExtractor
 
@@ -18,6 +21,9 @@ class ExtractionPipeline(BasePipeline):
 		self.pred_out, self.full_out = files
 		self.uuids = iterator.dataset.uuids
 		self.batch_size = iterator.batch_size
+
+
+
 
 	def to_out(self, im_id, part_id, box, out):
 		(x, y), w, h = box
@@ -36,34 +42,82 @@ class ExtractionPipeline(BasePipeline):
 		# del self_dict['pred_out']
 		# del self_dict['full_out']
 		return dict(
-			extractor=self.extractor
+			extractor=self.extractor,
+			inqueue=self.inqueue,
+			outqueue=self.outqueue,
+			worker_done=self.worker_done,
+			writer_done=self.writer_done,
 		)
 
 	def __setstate__(self, state):
 		self.__dict__.update(state)
 
+	def error_callback(self, exc):
+		print(exc)
 
 	def run(self):
-		with Pool(self.batch_size // 2) as pool:
-			return super(ExtractionPipeline, self).run(pool)
+		n_jobs = self.batch_size // 2
+		with Pool(n_jobs) as pool, Manager() as m:
 
-	def __call__(self, prop_iter, pool=None):
+			self.worker_done = m.Value("b", False)
+			self.writer_done = m.Value("b", False)
+			self.inqueue = m.Queue()#maxsize=20)
+			self.outqueue = m.Queue()
 
-		_map = map if pool is None else pool.map
+			self.writer_thread = threading.Thread(target=self.write_result)
+			self.writer_thread.deamon = True
+			self.writer_thread._state = 0
+			self.writer_thread.start()
 
-		for i, parts in _map(self.extract, prop_iter):
+			results = [pool.apply_async(self.extract, error_callback=self.error_callback) for _ in range(n_jobs)]
+
+			super(ExtractionPipeline, self).run()
+
+			self.worker_done.value = True
+			for result in results:
+				result.wait()
+
+			self.writer_done.value = True
+			self.writer_thread.join()
+
+	def __call__(self, prop_iter):
+
+		for i, im, grads, _ in prop_iter:
 
 			im_idx = i + self.batch_i * self.batch_size
 			im_uuid = self.uuids[im_idx]
+
+			self.inqueue.put([im_uuid, im, grads])
+
+	def extract(self):
+		while True:
+			if self.worker_done.value and self.inqueue.empty():
+				break
+
+			if self.inqueue.empty():
+				time.sleep(0.1)
+				continue
+
+			im_uuid, im, grads = self.inqueue.get()
+			# print("Processing item {}".format(im_uuid))
+			result = im_uuid, self.extractor(im, grads)
+			self.outqueue.put(result)
+
+		# print("Exiting worker", self.worker_done.value, self.inqueue.qsize())
+
+	def write_result(self):
+		while True:
+			if self.writer_done.value and self.outqueue.empty():
+				break
+
+			if self.outqueue.empty():
+				time.sleep(0.1)
+				continue
+
+			im_uuid, parts = self.outqueue.get()
 
 			for pred_part, full_part in zip(*parts):
 				self.to_pred_out(im_uuid, *pred_part)
 				self.to_full_out(im_uuid, *full_part)
 
-	def extract(self, args):
-		i, im, (pred_grad, full_grad), _ = args
-
-		try:
-			return i, self.extractor(im, [pred_grad, full_grad])
-		except KeyboardInterrupt:
-			pass
+		# print("Writer exists... {} | {} | {}".format(self.writer_done.value, self.inqueue.qsize(), self.outqueue.qsize()))
