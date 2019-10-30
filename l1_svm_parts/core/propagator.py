@@ -51,6 +51,13 @@ class Propagator(object):
 
 		self.reset()
 
+	def __getstate__(self):
+		self_dict = self.__dict__.copy()
+		del self_dict['pool']
+		return self_dict
+
+	def __setstate__(self, state):
+		self.__dict__.update(state)
 
 	@property
 	def coefs(self):

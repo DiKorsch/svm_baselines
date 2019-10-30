@@ -52,14 +52,14 @@ def main(args):
 		cluster_init=ClusterInitType.MAXIMAS,
 
 		feature_composition=args.feature_composition,
-		n_jobs=-1,
+		n_jobs=2,
 	)
 
 	propagator = Propagator(model, clf,
 		scaler=scaler,
 		topk=args.topk,
 		swap_channels=args.swap_channels,
-		n_jobs=-1,
+		n_jobs=1,
 	)
 
 	with outputs(args) as files:

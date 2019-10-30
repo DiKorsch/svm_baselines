@@ -3,8 +3,8 @@ import numpy as np
 
 from functools import partial
 from functools import wraps
-from multiprocessing.dummy import Pool
-from multiprocessing.pool import AsyncResult
+# from multiprocessing.dummy import Pool
+from multiprocessing.pool import AsyncResult, Pool
 from scipy.optimize import Bounds
 from scipy.optimize import minimize
 from sklearn.cluster import KMeans
@@ -12,6 +12,7 @@ from sklearn.cluster import KMeans
 from cluster_parts.utils import ClusterInitType
 from cluster_parts.utils import FeatureComposition
 from cluster_parts.utils import ThresholdType
+from cluster_parts.core.measures import Recall, Precision, FScore
 
 def _check_min_bbox(bbox, min_bbox):
 	y0, x0, y1, x1 = bbox
@@ -104,25 +105,47 @@ class BoundingBoxPartExtractor(object):
 
 		self.pool = Pool(n_jobs) if n_jobs >= 1 else None
 
+	def __getstate__(self):
+		self_dict = self.__dict__.copy()
+		del self_dict['pool']
+		return self_dict
+
+	def __setstate__(self, state):
+		self.__dict__.update(state)
+
+	def __del__(self):
+		if getattr(self, "pool", None) is None:
+			return
+
+		logging.info("Closing process pool")
+		self.pool.close()
+
+		logging.info("Waiting process pool to end...")
+		self.pool.join()
+
 
 	def __call__(self, image, saliencies):
 
-		_func = lambda saliency: self.__call_single__(image=image, saliency=saliency)
+		_func = partial(self.__call_single__, image=image)
+
 		if self.pool is None:
 			_map = map
 		else:
 			_map = self.pool.map
 
-		return _map(_func, saliencies)
+		return list(_map(_func, saliencies))
 
-	def __call_single__(self, image, saliency):
+	def __call_single__(self, saliency, image):
 		# if (saliency == 0).all():
 		# 	import pdb; pdb.set_trace()
 
-		saliency = self.corrector(saliency)
-		centers, labs = self.cluster_saliency(image, saliency)
-		boxes = self.get_boxes(centers, labs, saliency)
-		return boxes
+		try:
+			saliency = self.corrector(saliency)
+			centers, labs = self.cluster_saliency(image, saliency)
+			boxes = self.get_boxes(centers, labs, saliency)
+			return boxes
+		except KeyboardInterrupt:
+			pass
 
 
 	def get_boxes(self, centers, labels, saliency):
@@ -169,6 +192,11 @@ class BoundingBoxPartExtractor(object):
 		if not self.optimal:
 			return bbox
 
+		# (1) Our search area is [(x0,y0), (x1,y1)].
+		# (2) If we  shift it with (x0,y0) it becomes [(0,0), (w,h)]
+		# (3) We see it in normalized way, so it changes to [(0,0), (1,1)]
+		# (4) Hence, the initial bbox is always [(0.25, 0.25), (0.75, 0.75)]  with width and height 0.5
+
 		y0, x0, y1, x1 = bbox
 		h, w = y1 - y0, x1 - x0
 		search_area = mask[y0:y1, x0:x1].astype(np.float32)
@@ -180,62 +208,21 @@ class BoundingBoxPartExtractor(object):
 
 		scaler = np.array([h, w, h, w])
 
-		# (1) Our search area is [(x0,y0), (x1,y1)].
-		# (2) If we  shift it with (x0,y0) it becomes [(0,0), (w,h)]
-		# (3) We see it in normalized way, so it changes to [(0,0), (1,1)]
-		# (4) The initial bbox is then always [(0.25, 0.25), (0.75, 0.75)]  with width and height 0.5
-
 		init_bbox = np.array([0.25, 0.25, 0.75, 0.75])
 
-		def _measures(b, mask):
-			# scale back to the area mentioned in (2)
-			y0, x0, y1, x1 = map(int, b * scaler)
-			area = mask[y0:y1, x0:x1]
-			_h, _w = y1-y0, x1-x0
+		func = Recall(search_area, scaler=scaler)
 
-			if _h < _w:
-				ratio = (_h/_w) if _w != 0 else -100
-			else:
-				ratio = (_w/_h) if _h != 0 else -100
+		# func = Precision(search_area, scaler=scaler)
+		# func = FScore(search_area, scaler=scaler, beta=1)
+		# func = FScore(search_area, scaler=scaler, beta=2)
+		# func = FScore(search_area, scaler=scaler, beta=0.5)
 
-			##### THIS IS THE SLOWEST PART, BECAUSE IT IS CALLED MANY TIMES!
-
-			TP = area.sum()
-			FP = (1-area).sum()
-			FN = mask.sum() - TP
-			TN = (1-mask).sum() - FP
-
-			# ratio = 1
-			return TP, FP, FN, TN, ratio
-
-		def Recall(b, mask):
-			TP, FP, FN, TN, ratio = _measures(b, mask)
-			# if TP + FN == 0:
-			# 	return 0
-			return -(TP / (TP + FN)) * ratio
-
-		def Precision(b, mask):
-			TP, FP, FN, TN, ratio = _measures(b, mask)
-			# if TP + FP == 0:
-			# 	return 0
-			return -(TP / (TP + FP)) * ratio
-
-		def Fscore(b, mask, beta=1):
-			TP, FP, FN, TN, ratio = _measures(b, mask)
-			recall = TP / (TP + FN)
-			prec = TP / (TP + FP)
-
-			return -((1 + beta**2) * (recall * prec) / (recall + beta**2 * prec) )
-
-		F2 = partial(Fscore, beta=2)
-		F1 = partial(Fscore, beta=1)
-		F0_5 = partial(Fscore, beta=0.5)
-
-		res = minimize(Recall, init_bbox,
-					   args=(search_area,),
-					   options=dict(eps=1e-2, gtol=1e-1),
-					   bounds=Bounds(0, 1),
-					   )
+		res = minimize(
+			fun=func,
+			x0=init_bbox,
+			options=dict(eps=1e-2, gtol=1e-1),
+			bounds=Bounds(0, 1),
+		)
 		# scale back to (2) and shift to original values (1)
 		bbox = res.x * scaler + np.array([y0, x0, y0, x0])
 		bbox = _check_min_bbox(bbox, self.min_bbox)
