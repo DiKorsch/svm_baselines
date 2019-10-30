@@ -70,7 +70,7 @@ class Data(abc.ABC):
 		else:
 			scaler = IdentityScaler()
 
-		it, n_batches = new_iterator(data,
+		it, _ = new_iterator(data,
 			opts.n_jobs, opts.batch_size,
 			repeat=False, shuffle=False
 		)
@@ -79,6 +79,6 @@ class Data(abc.ABC):
 			for _data, subset in [(train_data, "training"), (val_data, "validation")]:
 				evaluate_data(clf, _data, subset, opts.topk, scaler)
 
-		return scaler, it, n_batches, model_info, n_classes
+		return scaler, it, model_info, n_classes
 
 

@@ -10,7 +10,7 @@ from chainer_addons.models import ModelType
 from chainer_addons.models import PrepareType
 from chainer_addons.utils.imgproc import _center_crop
 
-from l1_svm_parts.core.visualization import visualize_coefs
+from l1_svm_parts.core.pipelines.visualization import visualize_coefs
 
 class Model(abc.ABC):
 

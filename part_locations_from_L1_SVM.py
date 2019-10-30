@@ -16,7 +16,7 @@ from l1_svm_parts.core import Data
 from l1_svm_parts.core import Model
 from l1_svm_parts.core import Propagator
 from l1_svm_parts.core import ExtractionPipeline
-from l1_svm_parts.core import show_feature_saliency
+from l1_svm_parts.core import VisualizationPipeline
 from l1_svm_parts.utils import arguments
 
 from cluster_parts.core import BoundingBoxPartExtractor
@@ -40,7 +40,7 @@ def main(args):
 	GPU = args.gpu[0]
 
 	clf = Model.load_svm(args.trained_svm, args.visualize_coefs)
-	scaler, it, n_batches, *model_args = Data.new(args, clf)
+	scaler, it, *model_args = Data.new(args, clf)
 	model, prepare = Model.new(args, *model_args)
 
 	logging.info("Using following feature composition: {}".format(args.feature_composition))
@@ -62,36 +62,49 @@ def main(args):
 		feature_composition=args.feature_composition
 	)
 
-	with outputs(args) as files, Pool(args.batch_size // 2) as pool:
+	with outputs(args) as files, Pool(it.batch_size // 2) as pool:
 
+		kwargs = dict(
+			model=model,
+			extractor=extractor,
+			propagator=propagator,
+			iterator=it,
+			prepare=prepare,
+			device=GPU,
+		)
 		if args.extract:
 			pipeline = ExtractionPipeline(
-				extractor=extractor,
 				files=files,
-				uuids=it.dataset.uuids,
-				batch_size=args.batch_size,
+				**kwargs
+			)
+		else:
+			pipeline = VisualizationPipeline(
+				**kwargs
 			)
 
 
-		for batch_i, batch in tqdm(enumerate(it), total=n_batches):
+		pipeline.run(pool)
 
-			batch = [(prepare(im), lab) for im, _, lab in batch]
-			X, y = concat_examples(batch, device=GPU)
 
-			ims = chainer.Variable(X)
-			feats = model(ims, layer_name=model.meta.feature_layer)
+		# for batch_i, batch in tqdm(enumerate(it), total=n_batches):
 
-			if isinstance(feats, tuple):
-				feats = feats[0]
+		# 	batch = [(prepare(im), lab) for im, _, lab in batch]
+		# 	X, y = concat_examples(batch, device=GPU)
 
-			with propagator(feats, ims, y) as prop_iter:
+		# 	ims = chainer.Variable(X)
+		# 	feats = model(ims, layer_name=model.meta.feature_layer)
 
-				if args.extract:
-					pipeline(prop_iter, batch_i, pool=pool)
+		# 	if isinstance(feats, tuple):
+		# 		feats = feats[0]
 
-				else:
-					show_feature_saliency(prop_iter, extractor=extractor)
-					break
+		# 	with propagator(feats, ims, y) as prop_iter:
+
+		# 		if args.extract:
+		# 			pipeline(prop_iter, batch_i, pool=pool)
+
+		# 		else:
+		# 			show_feature_saliency(prop_iter, extractor=extractor)
+		# 			break
 
 
 np.seterr(all="raise")
