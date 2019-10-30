@@ -24,7 +24,7 @@ class VisualizationPipeline(BasePipeline):
 		self.peak_size = peak_size
 
 
-	def __call__(self, propagator, pool=None):
+	def __call__(self, propagator):
 
 		for i, im, (pred_grad, full_grad), (pred, gt) in propagator:
 

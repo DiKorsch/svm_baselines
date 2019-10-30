@@ -3,6 +3,7 @@ import numpy as np
 from chainer.cuda import to_cpu
 
 from functools import partial
+from multiprocessing.pool import Pool
 
 from cluster_parts.core import BoundingBoxPartExtractor
 
@@ -41,23 +42,16 @@ class ExtractionPipeline(BasePipeline):
 	def __setstate__(self, state):
 		self.__dict__.update(state)
 
-	def extract(self, args):
-		i, im, (pred_grad, full_grad), _ = args
 
-		try:
-			return i, self.extractor(im, [pred_grad, full_grad])
-		except KeyboardInterrupt:
-			pass
+	def run(self):
+		with Pool(self.batch_size // 2) as pool:
+			return super(ExtractionPipeline, self).run(pool)
 
-	def __call__(self, propagator, pool=None):
+	def __call__(self, prop_iter, pool=None):
 
-		if pool is None:
-			_map = map
-		else:
-			_map = pool.map
+		_map = map if pool is None else pool.map
 
-
-		for i, parts in _map(self.extract, propagator):
+		for i, parts in _map(self.extract, prop_iter):
 
 			im_idx = i + self.batch_i * self.batch_size
 			im_uuid = self.uuids[im_idx]
@@ -66,3 +60,10 @@ class ExtractionPipeline(BasePipeline):
 				self.to_pred_out(im_uuid, *pred_part)
 				self.to_full_out(im_uuid, *full_part)
 
+	def extract(self, args):
+		i, im, (pred_grad, full_grad), _ = args
+
+		try:
+			return i, self.extractor(im, [pred_grad, full_grad])
+		except KeyboardInterrupt:
+			pass

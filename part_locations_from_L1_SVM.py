@@ -6,7 +6,6 @@ import logging
 import numpy as np
 
 from contextlib import contextmanager
-from multiprocessing.pool import Pool
 from tqdm import tqdm
 
 from chainer.cuda import to_cpu
@@ -62,7 +61,7 @@ def main(args):
 		feature_composition=args.feature_composition
 	)
 
-	with outputs(args) as files, Pool(it.batch_size // 2) as pool:
+	with outputs(args) as files:
 
 		kwargs = dict(
 			model=model,
@@ -83,7 +82,7 @@ def main(args):
 			)
 
 
-		pipeline.run(pool)
+		pipeline.run()
 
 
 		# for batch_i, batch in tqdm(enumerate(it), total=n_batches):

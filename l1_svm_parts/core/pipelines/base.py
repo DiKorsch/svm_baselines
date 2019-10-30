@@ -17,11 +17,10 @@ class BasePipeline(abc.ABC):
 		self.iterator = iterator
 		self.prepare = prepare
 		self.device = device
-		self.model = model
 
 		self.n_batches = int(np.ceil(len(self.iterator.dataset.uuids) / self.iterator.batch_size))
 
-	def run(self, pool):
+	def run(self, *args, **kwargs):
 
 		for self.batch_i, batch in tqdm(enumerate(self.iterator), total=self.n_batches):
 
@@ -36,16 +35,8 @@ class BasePipeline(abc.ABC):
 
 			with self.propagator(feats, ims, y) as prop_iter:
 
-				self(prop_iter, pool)
-
-
-				# if args.extract:
-				# 	pipeline(prop_iter, batch_i, pool=pool)
-
-				# else:
-				# 	show_feature_saliency(prop_iter, extractor=extractor)
-				# 	break
+				self(prop_iter, *args, **kwargs)
 
 	@abc.abstractmethod
-	def __call__(self, iter, pool=None):
+	def __call__(self, iter, *args, **kwargs):
 		raise NotImplementedError
