@@ -6,6 +6,7 @@ import logging
 import numpy as np
 
 from contextlib import contextmanager
+from multiprocessing.pool import Pool
 from tqdm import tqdm
 
 from chainer.cuda import to_cpu
@@ -14,7 +15,7 @@ from chainer.dataset.convert import concat_examples
 from l1_svm_parts.core import Data
 from l1_svm_parts.core import Model
 from l1_svm_parts.core import Propagator
-from l1_svm_parts.core import extract_parts
+from l1_svm_parts.core import ExtractionPipeline
 from l1_svm_parts.core import show_feature_saliency
 from l1_svm_parts.utils import arguments
 
@@ -44,17 +45,6 @@ def main(args):
 
 	logging.info("Using following feature composition: {}".format(args.feature_composition))
 
-	extractor = BoundingBoxPartExtractor(
-		corrector=Corrector(gamma=args.gamma, sigma=args.sigma),
-
-		K=args.K,
-		thresh_type=args.thresh_type,
-		cluster_init=ClusterInitType.MAXIMAS,
-
-		feature_composition=args.feature_composition,
-		n_jobs=2,
-	)
-
 	propagator = Propagator(model, clf,
 		scaler=scaler,
 		topk=args.topk,
@@ -62,7 +52,27 @@ def main(args):
 		n_jobs=1,
 	)
 
-	with outputs(args) as files:
+	extractor = BoundingBoxPartExtractor(
+		corrector=Corrector(gamma=args.gamma, sigma=args.sigma),
+
+		K=args.K,
+		thresh_type=args.thresh_type,
+		cluster_init=ClusterInitType.MAXIMAS,
+
+		feature_composition=args.feature_composition
+	)
+
+	with outputs(args) as files, Pool(args.batch_size // 2) as pool:
+
+		if args.extract:
+			pipeline = ExtractionPipeline(
+				extractor=extractor,
+				files=files,
+				uuids=it.dataset.uuids,
+				batch_size=args.batch_size,
+			)
+
+
 		for batch_i, batch in tqdm(enumerate(it), total=n_batches):
 
 			batch = [(prepare(im), lab) for im, _, lab in batch]
@@ -77,7 +87,7 @@ def main(args):
 			with propagator(feats, ims, y) as prop_iter:
 
 				if args.extract:
-					extract_parts(prop_iter, it, batch_i, files, extractor=extractor)
+					pipeline(prop_iter, batch_i, pool=pool)
 
 				else:
 					show_feature_saliency(prop_iter, extractor=extractor)

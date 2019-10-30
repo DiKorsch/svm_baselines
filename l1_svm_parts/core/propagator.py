@@ -123,7 +123,7 @@ class Propagator(object):
 		pred, gt = self.topk_preds[self.i, -1], self.labs[self.i]
 
 		self.i += 1
-		return self.i - 1, im, (pred_grad, full_grad), (pred, gt)
+		return self.i - 1, im, (pred_grad, full_grad), (float(pred), float(gt))
 
 
 	def prepare_back(self, batch, is_grad=False):

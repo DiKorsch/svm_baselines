@@ -3,8 +3,6 @@ import numpy as np
 
 from functools import partial
 from functools import wraps
-# from multiprocessing.dummy import Pool
-from multiprocessing.pool import AsyncResult, Pool
 from scipy.optimize import Bounds
 from scipy.optimize import minimize
 from sklearn.cluster import KMeans
@@ -76,7 +74,7 @@ class BoundingBoxPartExtractor(object):
 				- input image
 
 			optimal (default: True)
-				- ...
+				- optimize bounding box selection
 
 			gamma, sigma
 				- saliency correction parameters
@@ -88,8 +86,7 @@ class BoundingBoxPartExtractor(object):
 		min_bbox=64, fit_object=False,
 		thresh_type=ThresholdType.Default,
 		cluster_init=ClusterInitType.Default,
-		feature_composition=FeatureComposition.Default,
-		n_jobs=2):
+		feature_composition=FeatureComposition.Default):
 		super(BoundingBoxPartExtractor, self).__init__()
 
 		self.corrector = corrector
@@ -103,49 +100,16 @@ class BoundingBoxPartExtractor(object):
 		self.fit_object = fit_object
 		self.min_bbox = min_bbox
 
-		self.pool = Pool(n_jobs) if n_jobs >= 1 else None
+	def __call__(self, image, saliency):
+		if isinstance(saliency, list):
+			return [self(image, sal) for sal in saliency]
 
-	def __getstate__(self):
-		self_dict = self.__dict__.copy()
-		del self_dict['pool']
-		return self_dict
-
-	def __setstate__(self, state):
-		self.__dict__.update(state)
-
-	def __del__(self):
-		if getattr(self, "pool", None) is None:
-			return
-
-		logging.info("Closing process pool")
-		self.pool.close()
-
-		logging.info("Waiting process pool to end...")
-		self.pool.join()
-
-
-	def __call__(self, image, saliencies):
-
-		_func = partial(self.__call_single__, image=image)
-
-		if self.pool is None:
-			_map = map
-		else:
-			_map = self.pool.map
-
-		return list(_map(_func, saliencies))
-
-	def __call_single__(self, saliency, image):
 		# if (saliency == 0).all():
 		# 	import pdb; pdb.set_trace()
-
-		try:
-			saliency = self.corrector(saliency)
-			centers, labs = self.cluster_saliency(image, saliency)
-			boxes = self.get_boxes(centers, labs, saliency)
-			return boxes
-		except KeyboardInterrupt:
-			pass
+		saliency = self.corrector(saliency)
+		centers, labs = self.cluster_saliency(image, saliency)
+		boxes = self.get_boxes(centers, labs, saliency)
+		return boxes
 
 
 	def get_boxes(self, centers, labels, saliency):
