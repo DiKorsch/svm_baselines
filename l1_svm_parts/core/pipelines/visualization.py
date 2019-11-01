@@ -23,6 +23,10 @@ class VisualizationPipeline(BasePipeline):
 		self.plot_topk_grads = plot_topk_grads
 		self.peak_size = peak_size
 
+		K = self.extractor.K
+
+		self.n_cols = int(np.ceil(np.sqrt(K)))
+		self.n_rows = int(np.ceil(K / self.n_cols))
 
 	def __call__(self, propagator):
 
@@ -31,9 +35,9 @@ class VisualizationPipeline(BasePipeline):
 			logging.debug("predicted class: {}, GT class: {}".format(pred, gt))
 			title ="Original Image [predicted: {}, GT: {}]".format(pred, gt)
 
-			spec = GridSpec(4, 4)
+			spec = GridSpec(2 * self.n_rows, 2 * self.n_cols)
 			fig = plt.figure(figsize=(16, 9))
-			ax0 = plt.subplot(spec[0:2, 0:2])
+			ax0 = plt.subplot(spec[ 0:self.n_rows, 0:self.n_cols ])
 
 			self.imshow(im, ax=ax0, title=title)
 			self.plot_gradient(im, pred_grad, spec=spec)
@@ -80,8 +84,8 @@ class VisualizationPipeline(BasePipeline):
 
 	def plot_gradient(self, im, grad, spec=None):
 
-		ax1 = plt.subplot(spec[2:4, 0:2])
-		ax2 = plt.subplot(spec[0:2, 2:4])
+		ax1 = plt.subplot(spec[self.n_rows:, :self.n_cols])
+		ax2 = plt.subplot(spec[:self.n_rows, self.n_cols:2*self.n_cols])
 
 		grad = self.extractor.corrector(grad)
 
@@ -116,8 +120,8 @@ class VisualizationPipeline(BasePipeline):
 		self.imshow(labs, ax1, cmap=cmap, alpha=0.3)
 
 		for i in range(self.extractor.K):
-			row, col = np.unravel_index(i, (2, 2))
-			_ax = plt.subplot(spec[row + 2, col + 2])
+			row, col = np.unravel_index(i, (self.n_rows, self.n_cols))
+			_ax = plt.subplot(spec[row + self.n_rows, col + self.n_cols])
 			_c, ((x, y), w, h) = boxes[i]
 			x,y,w,h = map(int, [x,y,w,h])
 			self.imshow(im[y:y+h, x:x+w], _ax, title="Part #{}".format(i+1))

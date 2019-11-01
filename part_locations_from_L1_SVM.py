@@ -55,34 +55,36 @@ def main(args):
 		corrector=Corrector(gamma=args.gamma, sigma=args.sigma),
 
 		K=args.K,
+		fit_object=True,
+
 		thresh_type=args.thresh_type,
 		cluster_init=ClusterInitType.MAXIMAS,
+		feature_composition=args.feature_composition,
 
-		feature_composition=args.feature_composition
 	)
 
-	with outputs(args) as files:
 
-		kwargs = dict(
-			model=model,
-			extractor=extractor,
-			propagator=propagator,
-			iterator=it,
-			prepare=prepare,
-			device=GPU,
-		)
-		if args.extract:
+	kwargs = dict(
+		model=model,
+		extractor=extractor,
+		propagator=propagator,
+		iterator=it,
+		prepare=prepare,
+		device=GPU,
+	)
+	if args.extract:
+		with outputs(args) as files:
 			pipeline = ExtractionPipeline(
 				files=files,
 				**kwargs
 			)
-		else:
-			pipeline = VisualizationPipeline(
-				**kwargs
-			)
+	else:
+		pipeline = VisualizationPipeline(
+			**kwargs
+		)
 
 
-		pipeline.run()
+	pipeline.run()
 
 
 		# for batch_i, batch in tqdm(enumerate(it), total=n_batches):
