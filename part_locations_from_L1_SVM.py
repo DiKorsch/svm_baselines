@@ -36,7 +36,6 @@ def outputs(args):
 
 
 def main(args):
-	GPU = args.gpu[0]
 
 	clf = Model.load_svm(args.trained_svm, args.visualize_coefs)
 	scaler, it, *model_args = Data.new(args, clf)
@@ -70,7 +69,7 @@ def main(args):
 		propagator=propagator,
 		iterator=it,
 		prepare=prepare,
-		device=GPU,
+		device=args.gpu[0],
 	)
 	if args.extract:
 		with outputs(args) as files:
@@ -85,27 +84,6 @@ def main(args):
 
 
 	pipeline.run()
-
-
-		# for batch_i, batch in tqdm(enumerate(it), total=n_batches):
-
-		# 	batch = [(prepare(im), lab) for im, _, lab in batch]
-		# 	X, y = concat_examples(batch, device=GPU)
-
-		# 	ims = chainer.Variable(X)
-		# 	feats = model(ims, layer_name=model.meta.feature_layer)
-
-		# 	if isinstance(feats, tuple):
-		# 		feats = feats[0]
-
-		# 	with propagator(feats, ims, y) as prop_iter:
-
-		# 		if args.extract:
-		# 			pipeline(prop_iter, batch_i, pool=pool)
-
-		# 		else:
-		# 			show_feature_saliency(prop_iter, extractor=extractor)
-		# 			break
 
 
 np.seterr(all="raise")
