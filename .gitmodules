@@ -1,0 +1,3 @@
+[submodule "cluster_parts"]
+	path = cluster_parts
+	url = gogs@triton.inf-cv.uni-jena.de:korsch/cluster_parts.git
