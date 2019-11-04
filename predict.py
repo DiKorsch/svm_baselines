@@ -18,7 +18,7 @@ from chainer_addons.models import ModelType
 from chainer_addons.links import PoolingType
 
 from cvdatasets.annotations import AnnotationType
-from baselines.utils import arguments, visualization
+from baselines.utils import arguments
 
 class CNN_Wrapper(object):
 	def __init__(self, model, label_shift):
