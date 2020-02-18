@@ -1,6 +1,6 @@
 if [[ ! -f /.dockerenv ]]; then
-	source ${HOME}/.anaconda3/etc/profile.d/conda.sh
-	conda activate chainer5
+	source ${HOME}/.miniconda3/etc/profile.d/conda.sh
+	conda activate ${CONDA_ENV:-chainer6}
 fi
 
 if [[ $GDB == "1" ]]; then
